@@ -12,24 +12,31 @@ In feed, a native-looking photo does not register as an ad until the viewer has
 already stopped scrolling. A polished, evenly-lit, perfectly-composed image
 announces itself as advertising immediately and gets scrolled past.
 
-## What this settles
+## Correction: there was no three-way contradiction
 
-The Lovable build carried **three contradictory master image prompts**
-(docs/SPEC.md §8):
+`docs/SPEC.md` §8 claims the live `app_settings.master_image_prompt` instructs
+the model to bake in typography, a logo, a benefits list and a yellow JOIN
+TODAY button, contradicting `REALISM_CONSTRAINTS`.
 
-| Source | Instruction |
-|---|---|
-| `app_settings.master_image_prompt` (the one actually running) | Bake in typography, a logo, a benefits list and a yellow JOIN TODAY button |
-| `DEFAULT_MASTER_PROMPT` in the component | Clean photo, **no** text or chrome |
-| A third default in `generate-images` | Shorter variant |
+**That claim is false.** The actual stored row was retrieved on 2026-09-03 and
+opens with:
 
-The direction above resolves it: **the clean-photo version is correct.** A real
-phone photo does not have a call-to-action button rendered into it. Brand chrome
-is composited afterwards — that is what the overlay path exists for.
+> CRITICAL: This is a PHOTOGRAPH ONLY. The brand chrome (headline, logo, CTA
+> strip, buttons, benefit icons, microcopy) will be composited on top of this
+> photo in code afterward.
 
-This also removes a live conflict inside a single request: the DB prompt asked
-for on-image text while `REALISM_CONSTRAINTS`, appended to every prompt,
-forbade it.
+followed by six explicit DO NOT rules covering text, logos, buttons, icons and
+colour bars. All three prompts agree; the spec's own summary misdescribed the
+row it was describing.
+
+Treat SPEC.md as a secondary source with at least one confirmed error. Where it
+matters, check against the retrieved source in this repo.
+
+The live prompt was also already pointing at this direction — it asked for "a
+real candid summer moment captured naturally... not overly staged, not
+stock-photo perfect, not cinematic Hollywood" and "a real weekend moment, not a
+photoshoot". What changes is the register (phone rather than DSLR) and removing
+the Carefree-specific parts, not the intent.
 
 ## What the master prompt should push toward
 
