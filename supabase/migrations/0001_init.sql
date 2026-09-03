@@ -381,3 +381,28 @@ begin
   return new;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Broader industry coverage, and Meta special ad categories.
+--
+-- The client roster spans boating, marinas, finance, insurance, home services
+-- and more. Finance/insurance usually fall under Meta's CREDIT category and
+-- real estate under HOUSING; both restrict targeting and constrain what the
+-- copy may claim, so the client record has to carry it.
+-- ---------------------------------------------------------------------------
+
+alter type industry add value if not exists 'finance';
+alter type industry add value if not exists 'insurance';
+alter type industry add value if not exists 'legal';
+alter type industry add value if not exists 'automotive';
+alter type industry add value if not exists 'hospitality';
+
+create type special_ad_category as enum (
+  'none', 'credit', 'employment', 'housing', 'social_issues'
+);
+
+alter table public.clients
+  add column special_ad_category special_ad_category not null default 'none';
+
+comment on column public.clients.special_ad_category is
+  'Meta Special Ad Category. Finance/insurance often fall under credit; real estate under housing. Drives copy compliance rules at generation time.';
