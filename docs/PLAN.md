@@ -113,12 +113,10 @@ details that leaked into the UI.
    preview. Approve keeps them; reject deletes the draft from Meta. This is the
    only place your judgment is actually required.
 
-Where the review gate sits is a real choice, and I'd want your call on it:
-approve **before** anything is created in Meta (nothing junk ever touches the
-account, but you're reviewing copy without seeing the real rendered ad), or
-approve **after** creation as paused drafts (you review the real thing, but
-rejects need cleaning up). Today it's before. Given "without me having to do
-anything crazy," after is probably better — but it's your ad account.
+**Decided: the gate sits after creation.** Launch builds everything as PAUSED
+drafts, and you review the real rendered ads rather than a mockup. Rejecting
+deletes the draft from the ad account — see §6 for what that requires. Ads are
+never activated by this tool; that stays manual in Ads Manager.
 
 ### Three ways content gets in — AI is one of them, not the only one
 
@@ -288,11 +286,11 @@ not delay the launch flow.
 
 | Phase | Scope | Gate |
 |---|---|---|
-| **0** | Rotate credentials, close `get_value` in the Lovable app | Same day, independent of everything else |
-| **1** | Own Supabase project; schema migration (renames, indexes, per-client brand settings, prompt tables, job tables); data + storage copy | Old and new DBs agree |
+| **0** | Rotate credentials; disable the Lovable edge functions | Same day, independent of everything else |
+| **1** | Own Supabase project; schema migration (renames, indexes, per-client brand settings, prompt tables, job tables); one-way data + storage copy | New DB verified against a snapshot of the old |
 | **2** | Next.js scaffold on Vercel; auth; clients + creatives CRUD; secrets in env | Can manage clients end to end |
 | **3** | Generation: copy (Opus 5, structured outputs, cached prompts) + images (direct OpenAI, streaming). **Prompt library ported verbatim first, tuned second.** | Output quality matches today's, judged side by side |
-| **4** | Push as a resumable job; idempotency; the unified launch flow, presets, and spreadsheet copy import | One click launches 12 ads, from AI or from a sheet |
+| **4** | Push and reject as resumable jobs; idempotency; the unified launch flow, presets, and spreadsheet copy import | One click launches 12 paused ads, from AI or from a sheet; rejecting removes them from Meta |
 | **5** | Insights pull, angle/scene performance ranking | — |
 
 Phase 3 carries the real risk. The prompt library in `SPEC.md` §6 is the
@@ -302,15 +300,52 @@ quality regresses in ways that are slow to notice and hard to attribute.
 
 ---
 
-## 6. Open questions
+## 6. Decisions made
 
-1. **Is the Lovable app in daily use during the rebuild?** Determines whether
-   we need both writing to Meta at once, and how careful Phase 1 has to be.
-2. **Review gate before or after ads exist in Meta?** (§2)
-3. **Solo forever, or will the team use it?** Changes how much auth and
-   role modelling Phase 2 deserves. Right now there is none at all.
-4. **Is Cloudinary earning its place?** It exists to stamp a tagline bar and
+**The Lovable app is being retired, not run alongside.** Once the rebuild
+ships, it is the only thing writing to Meta. Consequences:
+
+- Phase 1 is a clean one-way migration. Copy data and storage once, verify,
+  cut over. No dual-write window, no sync-back.
+- Push idempotency (§3) drops from urgent to merely correct-to-have — nothing
+  else will be pushing the same variations concurrently. Still build it; it
+  also protects against double-clicking Launch.
+- **Credential rotation in §0 is still required.** Retiring the app does not
+  un-expose a token that was already readable. Rotate regardless of what
+  happens to the Lovable project. The fastest way to close the hole itself is
+  to delete or disable the Lovable edge functions now, since nothing depends
+  on them any more.
+
+**The review gate sits after ads exist in Meta, as PAUSED drafts.** Launch
+creates everything; you review the real rendered ads and keep or kill them.
+Consequences:
+
+- The Meta client needs a **delete path** (`DELETE /{ad_id}`), which the
+  current app has no equivalent of — rejecting must remove the draft from the
+  ad account, not just mark a row.
+- Rejection is a job too, not a fire-and-forget loop: same bounded concurrency,
+  same progress, same resumability as push. A half-finished reject leaves junk
+  in a client account.
+- `ad_variations.status` gains a real lifecycle with a CHECK constraint —
+  today it is free-text with four observed values and no constraint at all.
+  Roughly: `draft → pushed → (kept | rejected)`.
+- The Facebook preview mockup stops being load-bearing. It is still useful
+  before launch, but the actual QA surface is the real ad. That removes the
+  pressure to keep `FacebookAdPreview` pixel-accurate — and makes its hardcoded
+  `learn.carefreeboats.com` domain a non-issue rather than a bug to fix.
+- **Ads stay PAUSED throughout.** Approving in AdFlow means "keep this draft",
+  never "activate it". Activation remains manual in Ads Manager
+  (`SPEC.md` §9 rule 10).
+
+## 7. Still open
+
+1. **Which Vercel plan?** Sets the function duration ceiling in §1.
+2. **Is Cloudinary earning its place?** It exists to stamp a tagline bar and a
    promo pill on images. Next.js can composite server-side with `satori` /
-   `sharp`, or the overlay can stay pure HTML in the preview. One less vendor,
-   one less credential.
-5. Which Vercel plan — it sets the function duration ceiling in §1.
+   `sharp`. One less vendor, one less credential, one less thing that forces a
+   fresh Meta image upload on every push.
+3. **Solo forever, or will the team use it?** There is no role model at all
+   today — auth is binary. Changes how much Phase 2 deserves.
+4. **Which master image prompt is the intended one** (§3) — needs your call,
+   since the DB row and the code default say opposite things and the DB row is
+   what has actually been running.
