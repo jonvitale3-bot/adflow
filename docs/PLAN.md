@@ -120,6 +120,55 @@ approve **after** creation as paused drafts (you review the real thing, but
 rejects need cleaning up). Today it's before. Given "without me having to do
 anything crazy," after is probably better — but it's your ad account.
 
+### Three ways content gets in — AI is one of them, not the only one
+
+The app must not assume it generated the ads. Two of these already need to be
+first-class inputs to the launch flow above, not side doors.
+
+**1. Images you already have.** This already exists and works — `CreativesTab`
+has a dropzone (click or drag), accepts JPEG/PNG/WebP, converts WebP to JPEG
+in-browser because Meta rejects it, and applies a label to the batch. It
+**must survive the port intact**, including the WebP conversion. What changes
+is placement: uploaded images should be selectable directly in the launch flow
+alongside "generate new", not a separate tab you visit first. Client-supplied
+creative and AI creative are the same thing downstream.
+
+**2. Copy from a spreadsheet.** New. Upload `.xlsx` or `.csv` (or paste a
+published Google Sheets CSV link — full Sheets API access needs OAuth and is
+not worth it for this) and import headlines and primary text directly, skipping
+generation entirely.
+
+- **Column mapping step.** Read the header row, let the user map columns →
+  `headline`, `primary_text`, and optionally `image` (matched against creative
+  label or filename), `link`, `cta`. Remember the mapping per client so the
+  same sheet format imports in one click next time.
+- **Validate, warn, don't block.** Run the same rules the generator follows —
+  headline 4–6 words, primary text ≤7 lines / ≤10 words per line, no
+  "click"/"tap"/"Learn More" as a verb in the CTA line, no month names — and
+  surface them as warnings on the row. Human-written copy is a deliberate
+  choice; the app flags, the operator decides. This is the opposite of how the
+  AI path treats those rules, and that asymmetry is correct.
+- **Pairing.** If the sheet names an image, honor it exactly. Otherwise fall
+  back to the same round-robin over non-archived creatives the generator uses.
+- **Round-trip.** The existing Excel export already emits headline / primary
+  text / image filename. Make the import accept **its own export format**
+  unchanged, so the workflow "export → edit in Sheets with the client →
+  re-import → launch" works with no reformatting. That is likely the most
+  common real use.
+
+`xlsx` is already a dependency for the export path, so parsing is nearly free.
+Parse **server-side** — the community `xlsx` build has had security advisories,
+and client-side parsing of a file a client emailed you is the wrong place for
+it.
+
+**3. AI generation.** As today.
+
+The consequence worth being explicit about: **AI generation becomes optional.**
+A launch is "pick a client, bring copy and images from wherever, review, push"
+— and generation is one convenient source of those inputs. That is a better fit
+for "a simple way to launch multiple ads" than an AI tool that also happens to
+push.
+
 ### Launch presets
 
 Save a launch config per client: batch size, scene mix, offer, destination.
@@ -243,7 +292,7 @@ not delay the launch flow.
 | **1** | Own Supabase project; schema migration (renames, indexes, per-client brand settings, prompt tables, job tables); data + storage copy | Old and new DBs agree |
 | **2** | Next.js scaffold on Vercel; auth; clients + creatives CRUD; secrets in env | Can manage clients end to end |
 | **3** | Generation: copy (Opus 5, structured outputs, cached prompts) + images (direct OpenAI, streaming). **Prompt library ported verbatim first, tuned second.** | Output quality matches today's, judged side by side |
-| **4** | Push as a resumable job; idempotency; the unified launch flow and presets | One click launches 12 ads |
+| **4** | Push as a resumable job; idempotency; the unified launch flow, presets, and spreadsheet copy import | One click launches 12 ads, from AI or from a sheet |
 | **5** | Insights pull, angle/scene performance ranking | — |
 
 Phase 3 carries the real risk. The prompt library in `SPEC.md` §6 is the
