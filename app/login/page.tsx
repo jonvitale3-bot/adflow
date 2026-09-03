@@ -37,10 +37,10 @@ function LoginForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full max-w-sm rounded-[--radius] border border-[--color-border] bg-[--color-card] p-8"
+      className="w-full max-w-sm rounded-card border border-border bg-card p-8"
     >
       <h1 className="text-2xl font-semibold">AdFlow</h1>
-      <p className="mt-1 text-sm text-[--color-muted]">Sign in to continue.</p>
+      <p className="mt-1 text-sm text-muted">Sign in to continue.</p>
 
       <label className="mt-6 block text-sm font-medium" htmlFor="email">
         Email
@@ -52,7 +52,7 @@ function LoginForm() {
         autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="mt-1 w-full rounded-md border border-[--color-border] bg-[--color-background] px-3 py-2 text-sm outline-none focus:border-[--color-primary]"
+        className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
       />
 
       <label className="mt-4 block text-sm font-medium" htmlFor="password">
@@ -66,11 +66,11 @@ function LoginForm() {
         autoComplete="current-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mt-1 w-full rounded-md border border-[--color-border] bg-[--color-background] px-3 py-2 text-sm outline-none focus:border-[--color-primary]"
+        className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
       />
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-[--color-destructive]">
+        <p role="alert" className="mt-4 text-sm text-destructive">
           {error}
         </p>
       )}
@@ -78,7 +78,7 @@ function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="mt-6 w-full rounded-md bg-[--color-primary] px-4 py-2 text-sm font-medium text-[--color-primary-foreground] disabled:opacity-50"
+        className="mt-6 w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
