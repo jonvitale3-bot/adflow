@@ -167,6 +167,38 @@ A launch is "pick a client, bring copy and images from wherever, review, push"
 for "a simple way to launch multiple ads" than an AI tool that also happens to
 push.
 
+### 2.2 Preview, twice, for two different reasons
+
+**Before launch — use Meta's own renderer, not a mockup.** The Graph API can
+render a real Facebook/Instagram preview from a creative spec **without
+creating an ad**: `GET /act_{ad_account_id}/generatepreviews` with a `creative`
+spec and an `ad_format`, which returns an embeddable iframe. There is a
+matching `GET /{ad_id}/previews` for ads that already exist. (Confirm the
+current `ad_format` enum values against the live Graph docs at build time —
+the format list changes as placements do.)
+
+This is strictly better than the hand-built `FacebookAdPreview` component:
+
+- It is **Meta's actual rendering**, so what you approve is what ships —
+  including truncation, line-break handling, and how the primary text collapses
+  behind "... more". That last one matters a lot here, because the entire copy
+  prompt is built around a 7-line / 10-word-per-line limit whose whole purpose
+  is surviving that truncation. Today you are eyeballing that rule against a
+  mockup that approximates it.
+- It renders **every placement** — feed, Stories, Reels, Instagram — instead of
+  one hardcoded desktop feed layout.
+- It fixes the hardcoded `learn.carefreeboats.com` display domain for free,
+  because the real renderer uses the client's actual link.
+
+Keep the existing HTML mockup as a **fallback** for when the preview call fails
+or rate-limits, and for the fast scroll through a 20-card grid where round-
+tripping to Meta for every card would be slow. Rough split: mockup for the
+grid, real Meta preview when you open a card.
+
+**After launch — the drafts themselves.** Paused ads in the account, previewed
+via `/{ad_id}/previews`, with keep/reject per ad. This is the final gate, and
+rejecting deletes the draft from Meta (§6).
+
 ### Launch presets
 
 Save a launch config per client: batch size, scene mix, offer, destination.
@@ -290,7 +322,7 @@ not delay the launch flow.
 | **1** | Own Supabase project; schema migration (renames, indexes, per-client brand settings, prompt tables, job tables); one-way data + storage copy | New DB verified against a snapshot of the old |
 | **2** | Next.js scaffold on Vercel; auth; clients + creatives CRUD; secrets in env | Can manage clients end to end |
 | **3** | Generation: copy (Opus 5, structured outputs, cached prompts) + images (direct OpenAI, streaming). **Prompt library ported verbatim first, tuned second.** | Output quality matches today's, judged side by side |
-| **4** | Push and reject as resumable jobs; idempotency; the unified launch flow, presets, and spreadsheet copy import | One click launches 12 paused ads, from AI or from a sheet; rejecting removes them from Meta |
+| **4** | Push and reject as resumable jobs; idempotency; real Meta previews both sides of the gate; the unified launch flow, presets, and spreadsheet copy import | One click launches 12 paused ads, from AI or from a sheet; rejecting removes them from Meta |
 | **5** | Insights pull, angle/scene performance ranking | — |
 
 Phase 3 carries the real risk. The prompt library in `SPEC.md` §6 is the
@@ -329,10 +361,11 @@ Consequences:
 - `ad_variations.status` gains a real lifecycle with a CHECK constraint —
   today it is free-text with four observed values and no constraint at all.
   Roughly: `draft → pushed → (kept | rejected)`.
-- The Facebook preview mockup stops being load-bearing. It is still useful
-  before launch, but the actual QA surface is the real ad. That removes the
-  pressure to keep `FacebookAdPreview` pixel-accurate — and makes its hardcoded
-  `learn.carefreeboats.com` domain a non-issue rather than a bug to fix.
+- **You still preview before launching.** Review-after adds a second look; it
+  does not remove the first one. Approving 12 ads into a client account sight
+  unseen is not "simple", and the pre-launch preview is what tells you whether
+  a batch is worth pushing at all. See §2.2 — and it should be Meta's real
+  renderer, not our mockup.
 - **Ads stay PAUSED throughout.** Approving in AdFlow means "keep this draft",
   never "activate it". Activation remains manual in Ads Manager
   (`SPEC.md` §9 rule 10).
