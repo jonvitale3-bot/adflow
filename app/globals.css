@@ -1,32 +1,91 @@
 @import "tailwindcss";
 
 /*
- * The Lovable build was dark-only: one token set under :root, no light theme,
- * nothing ever toggled a class (docs/SPEC.md §3). Keeping the dark palette so
- * the rebuild looks like the tool the operator already knows, but defining it
- * as real tokens rather than scattered literals.
+ * Design tokens from docs/DESIGN-BRIEF.md's handoff. Role-named on purpose:
+ * the dark theme rebinds these same names without renaming anything.
  */
 @theme {
-  --color-background: hsl(222 47% 11%);
-  --color-foreground: hsl(210 40% 98%);
-  --color-card: hsl(217 33% 17%);
-  --color-border: hsl(217 33% 24%);
-  --color-muted: hsl(215 20% 65%);
-  --color-primary: hsl(213 94% 58%);
-  --color-primary-foreground: hsl(210 40% 98%);
-  --color-success: hsl(142 71% 45%);
-  --color-warning: hsl(38 92% 50%);
-  --color-destructive: hsl(0 72% 51%);
-  --radius-card: 0.75rem;
+  --color-background: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f0f0f2;
+  --color-border: #e4e4e7;
+  --color-border-strong: #c9c9ce;
+
+  --color-text-primary: #17171a;
+  --color-text-secondary: #6b6b73;
+  --color-text-tertiary: #6e6e76;
+
+  --color-accent: #2e6be6;
+  --color-accent-hover: #2159cc;
+  --color-accent-subtle: #eaf1fe;
+  --color-accent-subtle-border: #d3e1fc;
+  --color-accent-text: #ffffff;
+
+  --color-success: #1a7f52;
+  --color-success-subtle: #e7f5ee;
+  --color-success-on-subtle: #166b46;
+
+  --color-warning: #a66300;
+  --color-warning-subtle: #fdf2e3;
+  --color-warning-on-subtle: #8a5300;
+
+  --color-danger: #c0392f;
+  --color-danger-subtle: #fcecea;
+  --color-danger-on-subtle: #a32e25;
+  --color-danger-border: #f3d3cf;
+
+  --font-sans: ui-sans-serif, -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.1), 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-modal: 0 24px 60px rgb(0 0 0 / 0.16), 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-panel: -16px 0 40px rgb(0 0 0 / 0.1);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 @layer base {
-  html {
-    color-scheme: dark;
+  :root {
+    --ring-focus: 0 0 0 3px rgb(46 107 230 / 0.28);
+    --ring-focus-danger: 0 0 0 3px rgb(192 57 47 / 0.18);
+    color-scheme: light;
   }
+
   body {
     background-color: var(--color-background);
-    color: var(--color-foreground);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* IDs, counts and result labels align in columns. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .focus-ring {
+    box-shadow: 0 0 0 1px #fff, var(--ring-focus);
+  }
+  .focus-ring-danger {
+    box-shadow: 0 0 0 1px #fff, var(--ring-focus-danger);
+  }
+}
+
+@keyframes shimmer {
+  from { background-position: -200px 0; }
+  to { background-position: 280px 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
