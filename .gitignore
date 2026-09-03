@@ -19,3 +19,7 @@ yarn-error.log*
 .idea/
 .vscode/
 *.swp
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
+next-env.d.ts

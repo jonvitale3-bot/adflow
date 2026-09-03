@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/*
+ * The Lovable build was dark-only: one token set under :root, no light theme,
+ * nothing ever toggled a class (docs/SPEC.md §3). Keeping the dark palette so
+ * the rebuild looks like the tool the operator already knows, but defining it
+ * as real tokens rather than scattered literals.
+ */
+@theme {
+  --color-background: hsl(222 47% 11%);
+  --color-foreground: hsl(210 40% 98%);
+  --color-card: hsl(217 33% 17%);
+  --color-border: hsl(217 33% 24%);
+  --color-muted: hsl(215 20% 65%);
+  --color-primary: hsl(213 94% 58%);
+  --color-primary-foreground: hsl(210 40% 98%);
+  --color-success: hsl(142 71% 45%);
+  --color-warning: hsl(38 92% 50%);
+  --color-destructive: hsl(0 72% 51%);
+  --radius: 0.75rem;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+}
