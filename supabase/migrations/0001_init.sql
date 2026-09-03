@@ -367,3 +367,17 @@ begin
     );
   end loop;
 end $$;
+
+-- Pin the trigger function's search_path. An unpinned search_path on a
+-- SECURITY-relevant function is hijackable by anything that can create objects
+-- in an earlier schema. Flagged by the Supabase security linter.
+create or replace function set_updated_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
