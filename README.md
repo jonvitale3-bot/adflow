@@ -1,21 +1,28 @@
 # adflow
 
-Rebuild of an ad tool originally prototyped in Lovable, targeting Vercel.
+Rebuild of an ad-generation tool prototyped in Lovable, targeting Vercel.
+
+AdFlow generates Meta (Facebook/Instagram) ad creative and copy with AI, gates
+it behind human approval, and pushes approved ads into existing campaigns as
+PAUSED drafts via the Marketing API. It writes to Meta; it does not report on
+Meta.
+
+## Docs
+
+| File | What it is |
+|---|---|
+| [`docs/SPEC.md`](docs/SPEC.md) | Handover spec for the existing Lovable build — schema, edge functions, the prompt library, known defects, and the 27 non-obvious business rules a rewrite would silently get wrong. **Source of truth.** |
+| [`docs/PLAN.md`](docs/PLAN.md) | Rebuild plan: target architecture, the workflow simplification, fixes, and phasing. |
+| [`docs/LOVABLE-EXPORT-PROMPT.md`](docs/LOVABLE-EXPORT-PROMPT.md) | The read-only prompt used to extract the spec out of Lovable. |
 
 ## Status
 
-Scaffolding only. Nothing is built yet — we are still capturing the spec for
-the existing Lovable prototype.
+Planning. No application code yet.
 
-## Next steps
+**Before any of this:** `docs/PLAN.md` §0 describes a live credential exposure
+in the existing Lovable app that needs handling independently of the rebuild.
 
-1. Run the export prompt in `docs/LOVABLE-EXPORT-PROMPT.md` against the Lovable
-   project (in Chat mode) and paste the reply back into Claude Code.
-2. Optionally connect the Lovable project to GitHub so the real source can be
-   read directly, which is strictly better than a description of it.
-3. Land the captured spec in `docs/SPEC.md`.
-4. Agree the target architecture, then scaffold and build.
+## Stack
 
-## Target hosting
-
-Vercel.
+Next.js (App Router) on Vercel, Supabase for data/auth/storage. See
+`docs/PLAN.md` §1 for the reasoning.
