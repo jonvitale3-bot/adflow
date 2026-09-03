@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+
+import { ClientPanel } from "@/components/clients/client-panel";
 
 import { Badge, AdAccountBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,9 @@ export function ClientsView({
   clients: ClientRow[];
   loadError: string | null;
 }) {
+  const router = useRouter();
+  const [panel, setPanel] = useState<{ open: boolean; client?: ClientRow }>({ open: false });
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [industry, setIndustry] = useState("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -59,13 +65,25 @@ export function ClientsView({
     );
   }
 
+  async function remove(client: ClientRow) {
+    // Archive, not delete — creatives and variations cascade from a client row.
+    if (!confirm(`Archive ${client.name}? Its creatives and generated copy are kept.`)) return;
+    setDeleting(client.id);
+    try {
+      const res = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
+      if (res.ok) router.refresh();
+    } finally {
+      setDeleting(null);
+    }
+  }
+
   const industriesPresent = [...new Set(clients.map((c) => c.industry))].sort();
 
   return (
     <>
       <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-border bg-surface px-8">
         <h1 className="text-[20px] font-semibold tracking-[-0.01em]">Clients</h1>
-        <Button variant="primary">Add Client</Button>
+        <Button variant="primary" onClick={() => setPanel({ open: true })}>Add Client</Button>
       </header>
 
       <div className="mx-auto w-full max-w-[1120px] p-6">
@@ -112,7 +130,7 @@ export function ClientsView({
             <EmptyState
               title="No clients yet"
               body="Add a business and AdFlow can generate its first batch of creative. Clients with several locations get grouped under one brand automatically."
-              action={<Button variant="primary">Add Client</Button>}
+              action={<Button variant="primary" onClick={() => setPanel({ open: true })}>Add Client</Button>}
             />
           ) : filtered.length === 0 ? (
             <EmptyState
@@ -148,7 +166,13 @@ export function ClientsView({
               <ul>
                 {entries.map((entry) =>
                   entry.kind === "single" ? (
-                    <ClientRowView key={entry.client.id} client={entry.client} />
+                    <ClientRowView
+                      key={entry.client.id}
+                      client={entry.client}
+                      busy={deleting === entry.client.id}
+                      onEdit={() => setPanel({ open: true, client: entry.client })}
+                      onDelete={() => remove(entry.client)}
+                    />
                   ) : (
                     <li key={entry.brand}>
                       <div
@@ -192,13 +216,20 @@ export function ClientsView({
                             </Badge>
                           )}
                         </span>
-                        <RowActions />
+                        <span />
                       </div>
 
                       {isExpanded(entry.brand) && (
                         <ul>
                           {entry.clients.map((client) => (
-                            <ClientRowView key={client.id} client={client} indented />
+                            <ClientRowView
+                              key={client.id}
+                              client={client}
+                              indented
+                              busy={deleting === client.id}
+                              onEdit={() => setPanel({ open: true, client })}
+                              onDelete={() => remove(client)}
+                            />
                           ))}
                         </ul>
                       )}
@@ -210,11 +241,45 @@ export function ClientsView({
           )}
         </div>
       </div>
+
+      <ClientPanel
+        open={panel.open}
+        initial={panel.client ? toFormValues(panel.client) : undefined}
+        title={panel.client ? "Edit client" : "Add client"}
+        subtitle={panel.client?.name ?? "New business · not yet connected"}
+        onClose={() => setPanel({ open: false })}
+        onSaved={() => router.refresh()}
+      />
     </>
   );
 }
 
-function ClientRowView({ client, indented = false }: { client: ClientRow; indented?: boolean }) {
+/** The list only selects the columns it renders; the panel refetches the rest. */
+function toFormValues(client: ClientRow) {
+  return {
+    id: client.id,
+    name: client.name,
+    industry: client.industry as never,
+    location_description: client.location_description ?? "",
+    landing_page_url: client.landing_page_url ?? "",
+    meta_ad_account_id: client.meta_ad_account_id ?? "",
+    market_name: client.market_name ?? "",
+  };
+}
+
+function ClientRowView({
+  client,
+  indented = false,
+  onEdit,
+  onDelete,
+  busy,
+}: {
+  client: ClientRow;
+  indented?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  busy?: boolean;
+}) {
   const location = locationOf(client);
 
   return (
@@ -234,21 +299,44 @@ function ClientRowView({ client, indented = false }: { client: ClientRow; indent
       <span>
         <AdAccountBadge state={adAccountState(client)} />
       </span>
-      <RowActions />
+      <RowActions onEdit={onEdit} onDelete={onDelete} busy={busy} />
     </li>
   );
 }
 
-function RowActions() {
+function RowActions({
+  onEdit,
+  onDelete,
+  busy,
+}: {
+  onEdit?: () => void;
+  onDelete?: () => void;
+  busy?: boolean;
+}) {
   return (
     <span className="flex justify-end gap-1">
-      <Button size="row" variant="ghost">Edit</Button>
       <Button
         size="row"
         variant="ghost"
-        className="hover:bg-danger-subtle hover:text-danger-on-subtle"
+        disabled={!onEdit}
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit?.();
+        }}
       >
-        Delete
+        Edit
+      </Button>
+      <Button
+        size="row"
+        variant="ghost"
+        disabled={!onDelete || busy}
+        className="hover:bg-danger-subtle hover:text-danger-on-subtle"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete?.();
+        }}
+      >
+        {busy ? "…" : "Delete"}
       </Button>
     </span>
   );
