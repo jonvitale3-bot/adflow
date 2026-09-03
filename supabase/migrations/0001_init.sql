@@ -406,3 +406,33 @@ alter table public.clients
 
 comment on column public.clients.special_ad_category is
   'Meta Special Ad Category. Finance/insurance often fall under credit; real estate under housing. Drives copy compliance rules at generation time.';
+
+-- ---------------------------------------------------------------------------
+-- Storage. Public read is REQUIRED, not an oversight: Meta's /adimages
+-- endpoint fetches the raw URL server-side from outside any session
+-- (docs/SPEC.md §9 rule 12). Making this private breaks every push.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('creatives', 'creatives', true, 20971520,
+        array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "Public can read creatives"
+  on storage.objects for select to anon, authenticated
+  using (bucket_id = 'creatives');
+
+create policy "Authenticated can upload creatives"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'creatives');
+
+create policy "Authenticated can update creatives"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'creatives') with check (bucket_id = 'creatives');
+
+create policy "Authenticated can delete creatives"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'creatives');
