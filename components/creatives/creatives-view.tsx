@@ -9,11 +9,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 import { prepareImage, storagePath } from "@/lib/creatives/image";
 import { createClient } from "@/lib/supabase/client";
+import { GenerateDialog } from "@/components/creatives/generate-dialog";
+import { sceneOptions } from "@/lib/generation/images/labels";
 
 interface ClientOption {
   id: string;
   name: string;
   meta_ad_account_id: string | null;
+  industry: string;
+  marine_business_type: string | null;
 }
 
 interface Creative {
@@ -35,6 +39,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const client = clients.find((c) => c.id === clientId);
@@ -200,8 +205,9 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
                   {syncing ? "Uploading…" : `Sync ${unsynced.length} to Meta`}
                 </Button>
               )}
-              <Button variant="primary" onClick={() => fileInput.current?.click()}>
-                Upload images
+              <Button onClick={() => fileInput.current?.click()}>Upload images</Button>
+              <Button variant="primary" onClick={() => setGenerating(true)} disabled={!clientId}>
+                Generate with AI
               </Button>
             </div>
           </div>
@@ -344,6 +350,16 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
           </div>
         </div>
       </div>
+
+      {generating && client && (
+        <GenerateDialog
+          clientId={client.id}
+          clientName={client.name}
+          scenes={sceneOptions(client.industry, client.marine_business_type)}
+          onClose={() => setGenerating(false)}
+          onDone={() => void load()}
+        />
+      )}
     </>
   );
 }

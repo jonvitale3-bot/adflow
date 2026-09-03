@@ -6,7 +6,7 @@ export default async function CreativesPage() {
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, meta_ad_account_id")
+    .select("id, name, meta_ad_account_id, industry, marine_business_type")
     .eq("archived", false)
     .order("name");
 
