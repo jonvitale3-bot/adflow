@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 
 import { DestinationPicker, type Destination } from "./destination";
+import { ImportDialog } from "./import-dialog";
 import { ReviewGrid, type Variation } from "./review-grid";
 
 interface ClientRecord {
@@ -59,6 +60,7 @@ export function LaunchView({
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
   const [creativeCount, setCreativeCount] = useState(0);
+  const [importing, setImporting] = useState(false);
 
   const client = clients.find((c) => c.id === clientId);
 
@@ -301,6 +303,14 @@ export function LaunchView({
             >
               {busy === "generate" ? "Generating copy…" : `Generate ${count} ads`}
             </Button>
+
+            <Button
+              className="mt-2 w-full"
+              disabled={busy !== null || !client}
+              onClick={() => setImporting(true)}
+            >
+              Import copy from a spreadsheet
+            </Button>
           </aside>
 
           <section>
@@ -327,6 +337,19 @@ export function LaunchView({
           </section>
         </div>
       </div>
+
+      {importing && client && (
+        <ImportDialog
+          clientId={client.id}
+          clientName={client.name}
+          onClose={() => setImporting(false)}
+          onImported={async (n) => {
+            setMessage({ tone: "ok", text: `Imported ${n} ad${n === 1 ? "" : "s"} as drafts.` });
+            await refresh();
+            setStage("review");
+          }}
+        />
+      )}
     </>
   );
 }
