@@ -117,3 +117,13 @@ test("no image descriptions means no pairing section at all", () => {
   assert.doesNotMatch(buildUserMessage(input()), /IMAGE PAIRING/);
   assert.doesNotMatch(buildUserMessage(input({ pairedImages: [null, null] })), /IMAGE PAIRING/);
 });
+
+test("copy is told not to repeat text already baked into the image", () => {
+  // Finished creatives often carry their own headline, offer badge or review.
+  // Restating it wastes the few lines an ad gets.
+  const msg = buildUserMessage(
+    input({ pairedImages: ["A softener install with a $75 off badge and a five-star review"] }),
+  );
+  assert.match(msg, /do NOT repeat it/);
+  assert.match(msg, /adding what the image does not say/);
+});

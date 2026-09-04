@@ -119,6 +119,8 @@ Each variation runs with a specific photo, listed below in order. Variation 1 ru
 
 Write each variation so it belongs with its image. The copy and the photo are one ad: if the photo shows an early-morning fishing scene, that variation should not be about family watersports. Reference what is in the frame naturally — never describe the photo literally, and never say "pictured above" or "as shown".
 
+If an image already carries its own headline, offer, review or badge, do NOT repeat it. The copy earns its place by adding what the image does not say. Restating the offer the image already shows wastes the only lines you get.
+
 Where a variation has no image, write it standalone.
 
 ${lines}
