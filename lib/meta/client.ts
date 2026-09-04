@@ -45,9 +45,13 @@ async function parse(res: Response): Promise<unknown> {
 
 async function request<T>(
   input: string,
-  init: RequestInit & { business?: string | null } = {},
+  init: RequestInit & { business?: string | null; token?: string } = {},
 ): Promise<T> {
-  const token = tokenForBusiness(init.business);
+  // An explicit token is for the endpoints that will not take the system user
+  // one: several Page edges require a Page access token specifically, and
+  // refuse everything else with "(#190) This method must be called with a Page
+  // Access Token".
+  const token = init.token ?? tokenForBusiness(init.business);
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
 
@@ -63,12 +67,16 @@ async function request<T>(
  * campaigns or ad sets at all, so long-tail accounts silently showed a
  * truncated list and ads went to the wrong place.
  */
-async function paginate<T>(first: string, business?: string | null): Promise<T[]> {
+async function paginate<T>(
+  first: string,
+  business?: string | null,
+  token?: string,
+): Promise<T[]> {
   const out: T[] = [];
   let next: string | undefined = first;
 
   for (let page = 0; page < MAX_PAGES && next; page++) {
-    const body: Paged<T> = await request<Paged<T>>(next, { business });
+    const body: Paged<T> = await request<Paged<T>>(next, { business, token });
     if (body.data?.length) out.push(...body.data);
     next = body.paging?.next;
   }
@@ -191,6 +199,28 @@ export interface InstagramLookup {
   attempts: Array<{ source: string; ok: boolean; found: number; error?: string }>;
 }
 
+/**
+ * The Page's own access token.
+ *
+ * A system user token can read one for any Page it has been assigned to in
+ * Business Manager, and several Page edges accept nothing else. Returns null
+ * rather than throwing, because every caller has something else to try.
+ */
+async function pageAccessToken(
+  pageId: string,
+  business?: string | null,
+): Promise<string | null> {
+  try {
+    const body = await request<{ access_token?: string }>(
+      url(pageId, { fields: "access_token" }),
+      { business },
+    );
+    return body.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function listInstagramAccounts(
   adAccountId: string,
   pageId?: string,
@@ -209,6 +239,9 @@ export async function listInstagramAccounts(
     },
   ];
 
+  // Fetched once and shared: the Page edges below refuse the system user token.
+  const pageToken = pageId ? await pageAccessToken(pageId, business) : null;
+
   if (pageId) {
     sources.push({
       name: "page instagram_accounts",
@@ -216,6 +249,7 @@ export async function listInstagramAccounts(
         paginate<InstagramAccount>(
           url(`${pageId}/instagram_accounts`, { fields: "id,username", limit: "100" }),
           business,
+          pageToken ?? undefined,
         ),
     });
     sources.push({
@@ -223,7 +257,10 @@ export async function listInstagramAccounts(
       run: async () => {
         const body = await request<{
           instagram_business_account?: InstagramAccount;
-        }>(url(pageId, { fields: "instagram_business_account{id,username}" }), { business });
+        }>(url(pageId, { fields: "instagram_business_account{id,username}" }), {
+          business,
+          token: pageToken ?? undefined,
+        });
         return body.instagram_business_account ? [body.instagram_business_account] : [];
       },
     });
@@ -242,6 +279,7 @@ export async function listInstagramAccounts(
             limit: "25",
           }),
           business,
+          pageToken ?? undefined,
         );
         return rows.map((row) => ({ ...row, pageBacked: true }));
       },
@@ -251,6 +289,18 @@ export async function listInstagramAccounts(
   const settled = await Promise.allSettled(sources.map((source) => source.run()));
   const merged = new Map<string, InstagramAccount>();
   const attempts: InstagramLookup["attempts"] = [];
+
+  // Reported first, because when the Page edges fail this is usually why.
+  if (pageId) {
+    attempts.push({
+      source: "page access token",
+      ok: Boolean(pageToken),
+      found: pageToken ? 1 : 0,
+      error: pageToken
+        ? undefined
+        : "Not available. The system user needs a role on this Page in Business Manager.",
+    });
+  }
 
   for (const [i, result] of settled.entries()) {
     const name = sources[i]!.name;
@@ -284,9 +334,15 @@ export async function createPageBackedInstagramAccount(
   pageId: string,
   business?: string | null,
 ): Promise<InstagramAccount> {
+  const token = await pageAccessToken(pageId, business);
   const body = await request<{ id: string }>(
     url(`${pageId}/page_backed_instagram_accounts`),
-    { method: "POST", body: new URLSearchParams(), business },
+    {
+      method: "POST",
+      body: new URLSearchParams(),
+      business,
+      token: token ?? undefined,
+    },
   );
   return { id: body.id, pageBacked: true };
 }

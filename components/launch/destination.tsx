@@ -50,6 +50,7 @@ export function DestinationPicker({
   >([]);
   const [igNote, setIgNote] = useState<string | null>(null);
   const [creatingIg, setCreatingIg] = useState(false);
+  const [manualIg, setManualIg] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -262,6 +263,31 @@ export function DestinationPicker({
                 {creatingIg ? "Creating…" : "Create one from the Page"}
               </Button>
             )}
+
+            {/* The last resort, and the one that always works: Business
+                Settings shows the account's numeric id, and pasting it needs
+                no permission this token does not have. */}
+            <div className="mt-2 flex items-center gap-1.5">
+              <input
+                value={manualIg}
+                onChange={(e) => setManualIg(e.target.value.trim())}
+                placeholder="Or paste an Instagram account ID"
+                inputMode="numeric"
+                className="h-[26px] min-w-0 flex-1 rounded-[5px] border border-border-strong bg-surface px-2 text-[12px] outline-none placeholder:text-text-tertiary focus:border-accent focus:focus-ring"
+              />
+              <Button
+                size="row"
+                disabled={!/^\d{5,}$/.test(manualIg)}
+                onClick={() => {
+                  setInstagram((prev) => [...prev, { id: manualIg }]);
+                  onChange({ ...value, instagramId: manualIg });
+                  setManualIg("");
+                  setIgNote("Using that account. Instagram placements can be used now.");
+                }}
+              >
+                Use
+              </Button>
+            </div>
 
             {igNote && (
               <p className="mt-1.5 text-[12px] text-text-secondary">{igNote}</p>
