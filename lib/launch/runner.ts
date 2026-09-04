@@ -82,11 +82,24 @@ async function pushOne(
   // Idempotency: an item retried after a timeout must not create a second ad.
   if (variation.meta_ad_id) return;
 
-  const creative = variation.creatives as unknown as
+  let creative = variation.creatives as unknown as
     | { id: string; image_url: string; meta_image_hash: string | null }
     | null;
 
-  if (!creative) throw new Error("This variation has no creative attached");
+  // Pair late when the variation has no creative yet.
+  //
+  // Pairing normally happens when a batch is saved, but copy can legitimately
+  // come first — imported from a spreadsheet, or generated before the images
+  // exist. Without this, that copy could never be pushed no matter how many
+  // creatives were added afterwards.
+  if (!creative) {
+    creative = await pairLate(db, client.id, variationId);
+    if (!creative) {
+      throw new Error(
+        "This client has no creatives, so there is no image to attach. Upload or generate one, then push again.",
+      );
+    }
+  }
   if (!client.meta_ad_account_id) throw new Error("Client has no ad account id");
   if (!client.meta_page_id) throw new Error("Client has no Facebook Page id");
 
@@ -163,6 +176,52 @@ async function pushOne(
       error: null,
     })
     .eq("id", variationId);
+}
+
+/**
+ * Assigns a creative to a variation that has none, spreading choices across the
+ * library rather than putting the same image on every late-paired ad.
+ */
+async function pairLate(
+  db: Db,
+  clientId: string,
+  variationId: string,
+): Promise<{ id: string; image_url: string; meta_image_hash: string | null } | null> {
+  const { data: creatives } = await db
+    .from("creatives")
+    .select("id, image_url, meta_image_hash, created_at")
+    .eq("client_id", clientId)
+    .eq("archived", false)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (!creatives?.length) return null;
+
+  // Spread by how many variations already point at each creative, so a late
+  // batch does not pile onto the first image.
+  const { data: used } = await db
+    .from("ad_variations")
+    .select("creative_id")
+    .eq("client_id", clientId)
+    .not("creative_id", "is", null);
+
+  const counts = new Map<string, number>();
+  for (const row of used ?? []) {
+    const id = row.creative_id as string;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  const chosen = creatives.reduce((best, c) =>
+    (counts.get(c.id) ?? 0) < (counts.get(best.id) ?? 0) ? c : best,
+  );
+
+  await db.from("ad_variations").update({ creative_id: chosen.id }).eq("id", variationId);
+
+  return {
+    id: chosen.id,
+    image_url: chosen.image_url,
+    meta_image_hash: chosen.meta_image_hash,
+  };
 }
 
 async function rejectOne(db: Db, variationId: string, business: string | null): Promise<void> {

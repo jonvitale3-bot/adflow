@@ -203,6 +203,30 @@ export function LaunchView({
     }
   }
 
+  async function pairNow() {
+    setBusy("pair");
+    setMessage(null);
+    try {
+      const res = await fetch("/api/launch/pair", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ clientId }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setMessage({ tone: "error", text: body.error ?? "Could not pair" });
+        return;
+      }
+      setMessage({
+        tone: "ok",
+        text: body.paired > 0 ? `Paired ${body.paired} with creatives.` : "Everything is already paired.",
+      });
+      await refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function refresh() {
     const { data } = await createClient()
       .from("ad_variations")
@@ -335,6 +359,7 @@ export function LaunchView({
                 onPush={(ids) => runJob("push", ids)}
                 onReject={(ids) => runJob("reject", ids)}
                 onRefresh={refresh}
+                onPair={pairNow}
               />
             )}
           </section>

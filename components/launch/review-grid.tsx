@@ -33,6 +33,7 @@ export function ReviewGrid({
   onPush,
   onReject,
   onRefresh,
+  onPair,
 }: {
   variations: Variation[];
   busy: string | null;
@@ -42,6 +43,7 @@ export function ReviewGrid({
   onPush: (ids: string[]) => void;
   onReject: (ids: string[]) => void;
   onRefresh: () => void;
+  onPair?: () => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -50,6 +52,7 @@ export function ReviewGrid({
   const failed = variations.filter((v) => v.status === "failed");
 
   const shown = drafts.length > 0 ? drafts : pushed.length > 0 ? pushed : variations;
+  const unpaired = shown.filter((v) => !v.creatives?.image_url);
   const reviewingDrafts = drafts.length > 0;
 
   function toggle(id: string) {
@@ -123,6 +126,18 @@ export function ReviewGrid({
         <p className="border-b border-border bg-warning-subtle px-5 py-2 text-[12px] text-warning-on-subtle">
           ▲ Choose an ad set before launching.
         </p>
+      )}
+
+      {unpaired.length > 0 && reviewingDrafts && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-warning-subtle px-5 py-2">
+          <p className="text-[12px] text-warning-on-subtle">
+            ▲ {unpaired.length} {unpaired.length === 1 ? "ad has" : "ads have"} no image yet.
+            They pair automatically at launch, or pair them now to see the result first.
+          </p>
+          {onPair && (
+            <Button size="row" onClick={onPair}>Pair with creatives</Button>
+          )}
+        </div>
       )}
 
       {progress && (
