@@ -1,4 +1,4 @@
-import { DEFAULT_RATIO, PLACEMENTS, RATIOS, type Ratio } from "../creatives/ratios.ts";
+import { DEFAULT_RATIO, placementsFor, RATIOS, type Ratio } from "../creatives/ratios.ts";
 
 /**
  * Placement asset customization.
@@ -23,6 +23,12 @@ export interface AssetFeedInput {
   message: string;
   headline: string;
   link: string;
+  /**
+   * Whether this client has an Instagram identity. Without one, no rule may
+   * name an Instagram placement: Meta refuses a creative that claims to run
+   * somewhere the advertiser has nobody to run as.
+   */
+  hasInstagram: boolean;
 }
 
 /** Ad labels have to be stable strings; the ratio name is already one. */
@@ -72,11 +78,17 @@ export function buildAssetFeedSpec(
 
   for (const ratio of RATIOS) {
     if (ratio === DEFAULT_RATIO || !byRatio.has(ratio)) continue;
+    const placements = placementsFor(ratio, input.hasInstagram);
+    if (!placements) continue;
     rules.push({
-      customization_spec: PLACEMENTS[ratio],
+      customization_spec: placements,
       image_label: { name: labelFor(ratio) },
     });
   }
+
+  // Only the default left: every placement would render with the square, which
+  // is the single-image path with more ways to be rejected.
+  if (rules.length === 0) return null;
 
   rules.push({
     customization_spec: {},

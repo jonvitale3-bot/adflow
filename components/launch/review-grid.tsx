@@ -68,13 +68,17 @@ export function ReviewGrid({
   const pushed = variations.filter((v) => v.status === "pushed");
   const failed = variations.filter((v) => v.status === "failed");
 
-  // A failed ad is the one you most need to read, and it was the one thing the
-  // grid never showed: with no drafts left it listed only what got through, so
-  // "6 failed" in the header pointed at nothing on screen.
-  const settled = variations.filter((v) => v.status === "pushed" || v.status === "failed");
-  const shown = drafts.length > 0 ? drafts : settled.length > 0 ? settled : variations;
+  // What is still to launch: a draft, or an attempt that did not reach Meta.
+  // A failed ad has no ad in the account, so it belongs with the drafts rather
+  // than with the ads that got through, and relaunching retries it.
+  //
+  // The grid used to filter failures out entirely — first whenever drafts
+  // remained, then whenever any did — so "2 failed" in the header pointed at
+  // nothing on screen and the reason was unreachable.
+  const pending = variations.filter((v) => v.status === "draft" || v.status === "failed");
+  const shown = pending.length > 0 ? pending : pushed.length > 0 ? pushed : variations;
   const unpaired = shown.filter((v) => !v.creatives?.image_url);
-  const reviewingDrafts = drafts.length > 0;
+  const reviewingDrafts = pending.length > 0;
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -87,7 +91,9 @@ export function ReviewGrid({
   // House rule: no dashes in ad copy. Generated copy rarely has them now, but
   // imported copy arrives however it was written.
   const dashed = shown.filter(
-    (v) => v.status === "draft" && (hasDash(v.headline) || hasDash(v.primary_text)),
+    (v) =>
+      (v.status === "draft" || v.status === "failed") &&
+      (hasDash(v.headline) || hasDash(v.primary_text)),
   );
 
   const selectedIds = [...selected].filter((id) => shown.some((v) => v.id === id));
@@ -113,7 +119,9 @@ export function ReviewGrid({
           <Badge tone="accent">{pushedCount} already in Meta</Badge>
         )}
         {failed.length > 0 && (
-          <Badge tone="danger" glyph="!">{failed.length} failed</Badge>
+          <Badge tone="danger" glyph="!">
+            {failed.length} failed, retried on relaunch
+          </Badge>
         )}
 
         <div className="ml-auto flex items-center gap-2">

@@ -138,6 +138,7 @@ async function pushOne(
         message: variation.primary_text,
         headline: variation.headline,
         link,
+        hasInstagram: Boolean(client.instagram_account_id),
       });
 
   const base = {

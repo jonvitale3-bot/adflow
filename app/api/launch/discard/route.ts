@@ -9,15 +9,15 @@ const BodySchema = z.object({
 });
 
 /**
- * Throws away drafts.
+ * Throws away ads that never reached Meta.
  *
- * A draft has never reached Meta, so this is a plain delete — no job, no ad to
- * remove from the account. That is the difference from rejecting, which exists
- * to pull a paused ad back out of a client's account and has to be a job
- * because it can fail halfway.
+ * A draft, or an attempt that failed, has nothing in the ad account, so this
+ * is a plain delete: no job, nothing to undo. That is the difference from
+ * rejecting, which pulls a paused ad back out of a client's account and has to
+ * be a job because it can fail halfway.
  *
- * Deliberately scoped to drafts. A pushed ad exists in the account, and
- * deleting our row would orphan it there with nothing left pointing at it.
+ * Deliberately excludes pushed ads. One exists in the account, and deleting
+ * our row would orphan it there with nothing left pointing at it.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -33,7 +33,9 @@ export async function POST(request: Request) {
     .from("ad_variations")
     .delete()
     .eq("client_id", parsed.data.clientId)
-    .eq("status", "draft")
+    // A failed attempt never reached Meta either, so it throws away the same
+    // way. Only a pushed ad has something in the account to consider.
+    .in("status", ["draft", "failed"])
     .in("id", parsed.data.variationIds)
     .select("id");
 

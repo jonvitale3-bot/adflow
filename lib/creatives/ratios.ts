@@ -108,3 +108,34 @@ export const PREVIEW_RATIOS: Record<string, Ratio> = {
 export function ratioForPreview(format: string): Ratio {
   return PREVIEW_RATIOS[format] ?? DEFAULT_RATIO;
 }
+
+/**
+ * The same placements, narrowed to what this client can actually run.
+ *
+ * A customization rule naming Instagram is a promise the ad can appear there,
+ * and Meta checks it: without an Instagram account or a Page eligible to stand
+ * in for one, the creative is refused with "Select an Instagram account or a
+ * Facebook Page to represent your business on Instagram". A client set to
+ * Facebook only must therefore not have Instagram in its rules at all.
+ *
+ * Returns null when nothing is left, so the caller drops the rule rather than
+ * sending one with no placements, which would claim everything.
+ */
+export function placementsFor(ratio: Ratio, hasInstagram: boolean): PlacementSpec | null {
+  const spec = PLACEMENTS[ratio];
+  if (hasInstagram) return spec;
+
+  const platforms = spec.publisher_platforms.filter((p) => p !== "instagram");
+  if (platforms.length === 0) return null;
+
+  const { instagram_positions: _dropped, ...rest } = spec;
+  const narrowed: PlacementSpec = { ...rest, publisher_platforms: platforms };
+
+  // A platform with no positions named is not a placement.
+  const named =
+    (narrowed.facebook_positions?.length ?? 0) +
+    (narrowed.audience_network_positions?.length ?? 0) +
+    (narrowed.messenger_positions?.length ?? 0);
+
+  return named > 0 ? narrowed : null;
+}

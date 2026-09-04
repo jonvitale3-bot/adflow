@@ -7,6 +7,7 @@ const COPY = {
   message: "Wet slips and dry racks at Bay Pines Marina.",
   headline: "Covered Dry Rack Boat Storage",
   link: "https://example.com/lp?utm_source=facebook",
+  hasInstagram: true,
 };
 
 test("one asset is not worth customizing", () => {
@@ -157,4 +158,47 @@ test("copy travels with the assets, not beside them", () => {
   assert.deepEqual(spec.bodies, [{ text: COPY.message }]);
   assert.deepEqual(spec.titles, [{ text: COPY.headline }]);
   assert.deepEqual(spec.link_urls, [{ website_url: COPY.link }]);
+});
+
+test("a client with no Instagram gets no Instagram placement", () => {
+  // Meta refuses a creative that claims to run somewhere the advertiser has
+  // nobody to run as: "Select an Instagram account or a Facebook Page to
+  // represent your business on Instagram."
+  const spec = buildAssetFeedSpec({
+    ...COPY,
+    hasInstagram: false,
+    assets: [
+      { ratio: "square", imageHash: "sq" },
+      { ratio: "vertical", imageHash: "vt" },
+    ],
+  })!;
+
+  const rules = spec.asset_customization_rules as Array<{
+    customization_spec: { publisher_platforms?: string[]; instagram_positions?: string[] };
+  }>;
+
+  for (const rule of rules) {
+    assert.ok(!rule.customization_spec.publisher_platforms?.includes("instagram"));
+    assert.equal(rule.customization_spec.instagram_positions, undefined);
+  }
+});
+
+test("the vertical still serves Facebook stories without Instagram", () => {
+  const spec = buildAssetFeedSpec({
+    ...COPY,
+    hasInstagram: false,
+    assets: [
+      { ratio: "square", imageHash: "sq" },
+      { ratio: "vertical", imageHash: "vt" },
+    ],
+  })!;
+
+  const rules = spec.asset_customization_rules as Array<{
+    image_label: { name: string };
+    customization_spec: { facebook_positions?: string[] };
+  }>;
+
+  const vertical = rules.find((r) => r.image_label.name === "ratio_vertical");
+  assert.ok(vertical, "the vertical rule was dropped entirely");
+  assert.deepEqual(vertical.customization_spec.facebook_positions, ["story"]);
 });
