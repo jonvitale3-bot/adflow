@@ -81,13 +81,18 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
 
   const visible = creatives.filter((c) => (showArchived ? c.archived : !c.archived));
   const archivedCount = creatives.filter((c) => c.archived).length;
-  // Every image that still needs a hash, renditions included: a creative whose
-  // vertical has never been uploaded is not "on Meta" in any useful sense.
-  const unsynced = creatives.filter(
-    (c) =>
-      !c.archived &&
-      (!c.meta_image_hash || c.creative_assets.some((a) => !a.meta_image_hash)),
-  );
+  // Counted in images, not creatives. Every size is its own upload to Meta and
+  // its own hash, so five creatives each missing a vertical and a horizontal
+  // is ten uploads, and saying "5" would understate the work by two thirds.
+  const unsyncedImages = creatives
+    .filter((c) => !c.archived)
+    .reduce(
+      (n, c) =>
+        n +
+        (c.meta_image_hash ? 0 : 1) +
+        c.creative_assets.filter((a) => !a.meta_image_hash).length,
+      0,
+    );
 
   // Active creatives with nothing to serve a story or reel with. They still
   // launch — Meta fits the square into the frame — but a fitted square is a
@@ -395,7 +400,9 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
       } else {
         setMessage({
           tone: body.failed > 0 ? "error" : "ok",
-          text: `Uploaded ${body.synced} to Meta${body.failed ? `, ${body.failed} failed` : ""}.`,
+          text: `Uploaded ${body.synced} image${body.synced === 1 ? "" : "s"} to Meta${
+            body.failed ? `, ${body.failed} failed` : ""
+          }.`,
         });
       }
       void load();
@@ -460,9 +467,15 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
                   {filling ? "Building…" : `Build ${missingVertical} vertical`}
                 </Button>
               )}
-              {unsynced.length > 0 && (
-                <Button onClick={syncToMeta} disabled={syncing || !client?.meta_ad_account_id}>
-                  {syncing ? "Uploading…" : `Sync ${unsynced.length} to Meta`}
+              {unsyncedImages > 0 && (
+                <Button
+                  onClick={syncToMeta}
+                  disabled={syncing || !client?.meta_ad_account_id}
+                  title="Uploads every size that Meta does not have yet. Each aspect ratio is a separate image in the ad account."
+                >
+                  {syncing
+                    ? "Uploading…"
+                    : `Sync ${unsyncedImages} image${unsyncedImages === 1 ? "" : "s"} to Meta`}
                 </Button>
               )}
               <Button onClick={() => fileInput.current?.click()}>Upload images</Button>
