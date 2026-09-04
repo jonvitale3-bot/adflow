@@ -8,7 +8,7 @@ export default async function ClientsPage() {
   const { data, error } = await supabase
     .from("clients")
     .select(
-      "id, name, brand, location_label, industry, market_name, location_description, landing_page_url, meta_ad_account_id",
+      "id, name, brand, location_label, industry, market_name, location_description, landing_page_url, meta_ad_account_id, special_ad_category",
     )
     .eq("archived", false)
     .order("name");

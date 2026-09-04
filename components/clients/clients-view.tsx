@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { BrandPanel } from "@/components/clients/brand-panel";
 import { ClientPanel } from "@/components/clients/client-panel";
 
 import { Badge, AdAccountBadge } from "@/components/ui/badge";
@@ -19,7 +20,7 @@ import {
   type ClientRow,
 } from "@/lib/clients/grouping";
 
-const GRID = "grid grid-cols-[1fr_130px_190px_150px_90px] items-center gap-3 px-6";
+const GRID = "grid grid-cols-[1fr_130px_170px_150px_150px] items-center gap-3 px-6";
 
 export function ClientsView({
   clients,
@@ -31,6 +32,7 @@ export function ClientsView({
   const router = useRouter();
   const [panel, setPanel] = useState<{ open: boolean; client?: ClientRow }>({ open: false });
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [voiceFor, setVoiceFor] = useState<ClientRow | null>(null);
   const [query, setQuery] = useState("");
   const [industry, setIndustry] = useState("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -171,6 +173,7 @@ export function ClientsView({
                       client={entry.client}
                       busy={deleting === entry.client.id}
                       onEdit={() => setPanel({ open: true, client: entry.client })}
+                      onVoice={() => setVoiceFor(entry.client)}
                       onDelete={() => remove(entry.client)}
                     />
                   ) : (
@@ -228,6 +231,7 @@ export function ClientsView({
                               indented
                               busy={deleting === client.id}
                               onEdit={() => setPanel({ open: true, client })}
+                              onVoice={() => setVoiceFor(client)}
                               onDelete={() => remove(client)}
                             />
                           ))}
@@ -241,6 +245,16 @@ export function ClientsView({
           )}
         </div>
       </div>
+
+      {voiceFor && (
+        <BrandPanel
+          clientId={voiceFor.id}
+          clientName={voiceFor.name}
+          landingPageUrl={voiceFor.landing_page_url}
+          specialAdCategory={voiceFor.special_ad_category ?? "none"}
+          onClose={() => setVoiceFor(null)}
+        />
+      )}
 
       <ClientPanel
         open={panel.open}
@@ -272,12 +286,14 @@ function ClientRowView({
   indented = false,
   onEdit,
   onDelete,
+  onVoice,
   busy,
 }: {
   client: ClientRow;
   indented?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  onVoice?: () => void;
   busy?: boolean;
 }) {
   const location = locationOf(client);
@@ -299,7 +315,7 @@ function ClientRowView({
       <span>
         <AdAccountBadge state={adAccountState(client)} />
       </span>
-      <RowActions onEdit={onEdit} onDelete={onDelete} busy={busy} />
+      <RowActions onEdit={onEdit} onDelete={onDelete} onVoice={onVoice} busy={busy} />
     </li>
   );
 }
@@ -307,14 +323,28 @@ function ClientRowView({
 function RowActions({
   onEdit,
   onDelete,
+  onVoice,
   busy,
 }: {
   onEdit?: () => void;
   onDelete?: () => void;
+  onVoice?: () => void;
   busy?: boolean;
 }) {
   return (
     <span className="flex justify-end gap-1">
+      <Button
+        size="row"
+        variant="ghost"
+        disabled={!onVoice}
+        title="Brand voice"
+        onClick={(e) => {
+          e.stopPropagation();
+          onVoice?.();
+        }}
+      >
+        Voice
+      </Button>
       <Button
         size="row"
         variant="ghost"

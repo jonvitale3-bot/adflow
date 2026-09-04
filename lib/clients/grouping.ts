@@ -23,6 +23,7 @@ export interface ClientRow {
   location_description: string | null;
   landing_page_url: string | null;
   meta_ad_account_id: string | null;
+  special_ad_category?: string;
 }
 
 export function splitBrand(name: string): { brand: string; location: string | null } {
