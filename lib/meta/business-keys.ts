@@ -14,9 +14,13 @@ export function envNameFor(key: string): string {
   return `META_ACCESS_TOKEN_${key.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
 }
 
-/** "engage" -> "Engage", "second_bm" -> "Second bm". For display only. */
+/**
+ * "engage" -> "Engage", "second_bm" -> "Second bm". For display only, and only
+ * as a fallback: the real Business Manager name comes from Meta
+ * (lib/meta/business-names.ts) and is what the UI normally shows.
+ */
 export function businessLabel(key: string): string {
-  if (key === DEFAULT_BUSINESS_KEY) return "Default portfolio";
+  if (key === DEFAULT_BUSINESS_KEY) return "Main portfolio";
   const spaced = key.replace(/[_-]+/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

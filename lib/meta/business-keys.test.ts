@@ -24,7 +24,7 @@ test("the default key maps to the plain variable, others get a suffix", () => {
 });
 
 test("labels are readable", () => {
-  assert.equal(businessLabel("default"), "Default portfolio");
+  assert.equal(businessLabel("default"), "Main portfolio");
   assert.equal(businessLabel("engage"), "Engage");
   assert.equal(businessLabel("second_bm"), "Second bm");
 });

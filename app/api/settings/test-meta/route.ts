@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { businessLabel } from "@/lib/meta/business-keys";
+import { labelFrom, pickBusinessName, rememberBusinessName } from "@/lib/meta/business-names";
 import { listAdAccounts, listPages, MetaApiError } from "@/lib/meta/client";
 import { configuredBusinesses } from "@/lib/meta/tokens";
 import { createClient } from "@/lib/supabase/server";
@@ -30,9 +31,15 @@ export async function GET() {
     businesses.map(async ({ key, envName }) => {
       try {
         const [adAccounts, pages] = await Promise.all([listAdAccounts(key), listPages(key)]);
+
+        // The accounts are already here, so name the portfolio from them
+        // rather than asking Meta again — and warm the picker while at it.
+        const name = pickBusinessName(adAccounts);
+        rememberBusinessName(key, name);
+
         return {
           key,
-          label: businessLabel(key),
+          label: labelFrom(key, name),
           envName,
           ok: true,
           adAccounts: adAccounts.map((a) => ({
