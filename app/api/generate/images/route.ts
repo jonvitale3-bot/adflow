@@ -38,14 +38,14 @@ export async function POST(request: Request) {
   const { data: client } = await supabase
     .from("clients")
     .select(
-      "id, name, industry, marine_business_type, market_name, location_description, boating_style, environment_style, business_type_description, tone_keywords",
+      "id, name, industry, marine_business_type, marine_business_types, market_name, location_description, boating_style, environment_style, business_type_description, tone_keywords",
     )
     .eq("id", clientId)
     .single();
 
   if (!client) return Response.json({ error: "Client not found" }, { status: 404 });
 
-  const bank = bankFor(client.industry, client.marine_business_type);
+  const bank = bankFor(client.industry, client.marine_business_types);
   const scenes = bank
     ? selectScenes(bank, scene, count)
     : Array.from({ length: count }, () => ({ id: "", text: "" }));

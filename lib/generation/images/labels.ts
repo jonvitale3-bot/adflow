@@ -30,10 +30,31 @@ export const SCENE_LABELS: Record<string, string> = {
   marina_hero: "Marina hero",
 };
 
-export function sceneOptions(industry: string, marineBusinessType?: string | null) {
-  const bank = bankFor(industry, marineBusinessType);
+const SERVICE_LABELS: Record<string, string> = {
+  boat_rentals: "Rentals",
+  wet_slips: "Wet slips",
+  dry_storage: "Dry storage",
+  storage_slips: "Storage & slips",
+  full_service: "Full service",
+};
+
+/**
+ * Scene ids from a multi-service marina are namespaced "service:scene", so the
+ * label carries the service — "Rentals · Sunset cruise" rather than two
+ * entries both called "Dock walk".
+ */
+export function sceneOptions(industry: string, marineBusinessTypes?: string[] | string | null) {
+  const bank = bankFor(industry, marineBusinessTypes);
   if (!bank) return [];
-  return Object.keys(bank).map((id) => ({ id, label: SCENE_LABELS[id] ?? id }));
+
+  return Object.keys(bank).map((id) => {
+    const [maybeService, maybeScene] = id.split(":");
+    if (maybeScene) {
+      const service = SERVICE_LABELS[maybeService!] ?? maybeService!;
+      return { id, label: `${service} · ${SCENE_LABELS[maybeScene] ?? maybeScene}` };
+    }
+    return { id, label: SCENE_LABELS[id] ?? id };
+  });
 }
 
 export { SCENE_BANK };

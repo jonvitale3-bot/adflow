@@ -22,7 +22,7 @@ import {
 const EMPTY: ClientFormValues = {
   name: "",
   industry: "boat_club",
-  marine_business_type: "",
+  marine_business_types: [],
   special_ad_category: "none",
   meta_business: "",
   location_description: "",
@@ -73,11 +73,41 @@ export function ClientPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const [businesses, setBusinesses] = useState<Array<{ key: string; label: string }>>([]);
 
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    setValues({ ...EMPTY, ...initial });
     setErrors({});
     setAiFields(new Set());
     setFormError(null);
+    setNotice(null);
+
+    if (!open) return;
+
+    if (!initial?.id) {
+      setValues({ ...EMPTY, ...initial });
+      return;
+    }
+
+    // Load the whole record. Seeding only what the list selected would blank
+    // every other field on save.
+    setLoading(true);
+    void fetch(`/api/clients/${initial.id}`)
+      .then((r) => r.json())
+      .then((body) => {
+        if (!body.client) {
+          setFormError("Could not load this client.");
+          return;
+        }
+        const c = body.client as Record<string, unknown>;
+        const next: Record<string, unknown> = { ...EMPTY };
+        for (const key of Object.keys(EMPTY)) {
+          const value = c[key];
+          if (value !== null && value !== undefined) next[key] = value;
+        }
+        setValues(next as ClientFormValues);
+      })
+      .catch(() => setFormError("Could not load this client."))
+      .finally(() => setLoading(false));
   }, [initial, open]);
 
   useEffect(() => {
@@ -140,7 +170,7 @@ export function ClientPanel({
           name: values.name,
           locationDescription: values.location_description,
           industry: values.industry,
-          marineBusinessType: values.marine_business_type || undefined,
+          marineBusinessType: (values.marine_business_types ?? [])[0] || undefined,
         }),
       });
       const body = await res.json();
@@ -241,6 +271,10 @@ export function ClientPanel({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          {loading && (
+            <p className="mb-4 text-[13px] text-text-secondary">Loading client…</p>
+          )}
+
           {formError && (
             <p
               role="alert"
@@ -288,21 +322,53 @@ export function ClientPanel({
             </Select>
 
             {isMarina && (
-              <Select
-                label="Marina business type"
-                required
-                error={errors.marine_business_type}
-                hint="Selects the prompt and scene bank. Without it a marina falls back to the generic prompt."
-                value={values.marine_business_type ?? ""}
-                onChange={(e) =>
-                  set("marine_business_type", e.target.value as ClientFormValues["marine_business_type"])
-                }
-              >
-                <option value="">Choose a type…</option>
-                {MARINE_BUSINESS_TYPES.map((t) => (
-                  <option key={t} value={t}>{MARINE_TYPE_LABELS[t]}</option>
-                ))}
-              </Select>
+              <fieldset>
+                <legend className="mb-1.5 text-[12px] font-[550] text-text-secondary">
+                  Services offered <span className="text-danger">*</span>
+                </legend>
+                <div className="flex flex-col gap-1.5 rounded-md border border-border-strong p-2.5">
+                  {MARINE_BUSINESS_TYPES.map((t) => {
+                    const selected = (values.marine_business_types ?? []) as string[];
+                    const checked = selected.includes(t);
+                    const isPrimary = selected[0] === t;
+                    return (
+                      <label key={t} className="flex items-center gap-2 text-[13px]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          className="h-4 w-4 rounded-sm accent-[var(--color-accent)]"
+                          onChange={() => {
+                            const next = checked
+                              ? selected.filter((v) => v !== t)
+                              : [...selected, t];
+                            set(
+                              "marine_business_types",
+                              next as ClientFormValues["marine_business_types"],
+                            );
+                          }}
+                        />
+                        <span>{MARINE_TYPE_LABELS[t]}</span>
+                        {isPrimary && selected.length > 1 && (
+                          <span className="rounded-sm bg-surface-muted px-1.5 py-0.5 text-[10px] text-text-secondary">
+                            primary
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+                {errors.marine_business_types ? (
+                  <p className="mt-1.5 flex gap-[5px] text-[12px] text-danger-on-subtle">
+                    <span aria-hidden className="font-bold">!</span>
+                    {errors.marine_business_types}
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-[12px] leading-[1.4] text-text-tertiary">
+                    Pick everything this location actually offers. The first selected sets the
+                    prompt; all of them contribute image scenes.
+                  </p>
+                )}
+              </fieldset>
             )}
 
             <Select
@@ -465,7 +531,7 @@ export function ClientPanel({
           </span>
           <div className="flex gap-2">
             <Button onClick={onClose}>Cancel</Button>
-            <Button variant="primary" onClick={save} disabled={saving}>
+            <Button variant="primary" onClick={save} disabled={saving || loading}>
               {saving ? "Saving…" : "Save client"}
             </Button>
           </div>

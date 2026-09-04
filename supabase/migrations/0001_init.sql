@@ -455,3 +455,30 @@ comment on column public.clients.meta_business is
 
 create index clients_meta_business_idx on public.clients (meta_business)
   where meta_business is not null;
+
+-- ---------------------------------------------------------------------------
+-- A marina commonly offers several services at one location — rentals and
+-- slips and storage. A single subtype forced a choice that misrepresented the
+-- business and narrowed image generation to one scene bank.
+--
+-- The first element is the primary service and selects the prompt template;
+-- every element contributes its scene bank, so a batch shows the full range of
+-- what the location actually does.
+-- ---------------------------------------------------------------------------
+
+alter table public.clients
+  add column marine_business_types marine_business_type[] not null default '{}';
+
+update public.clients
+set marine_business_types = array[marine_business_type]
+where marine_business_type is not null;
+
+alter table public.clients drop constraint marina_requires_subtype;
+
+alter table public.clients
+  add constraint marina_requires_service check (
+    industry <> 'marina' or array_length(marine_business_types, 1) >= 1
+  );
+
+comment on column public.clients.marine_business_types is
+  'Services this marina offers. First element is primary and selects the prompt template; all elements contribute scenes. The scalar marine_business_type retains the primary value.';

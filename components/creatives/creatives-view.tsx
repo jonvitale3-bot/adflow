@@ -17,7 +17,7 @@ interface ClientOption {
   name: string;
   meta_ad_account_id: string | null;
   industry: string;
-  marine_business_type: string | null;
+  marine_business_types: string[] | null;
 }
 
 interface Creative {
@@ -355,7 +355,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
         <GenerateDialog
           clientId={client.id}
           clientName={client.name}
-          scenes={sceneOptions(client.industry, client.marine_business_type)}
+          scenes={sceneOptions(client.industry, client.marine_business_types)}
           onClose={() => setGenerating(false)}
           onDone={() => void load()}
         />

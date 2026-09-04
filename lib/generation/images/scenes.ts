@@ -94,13 +94,45 @@ export const SCENE_BANK: Record<string, Record<string, string>> = {
   full_service: FULL_SERVICE_SCENES,
 };
 
-/** Which bank applies, or null when the industry has no scenes. */
-export function bankFor(industry: string, marineBusinessType?: string | null) {
+/**
+ * Which scenes apply.
+ *
+ * A marina often offers several services at one location, so the bank is the
+ * union of every service's scenes — a full-service marina that also rents
+ * boats should be able to show both. Scene ids are namespaced by service
+ * because banks share names (several define "dock_walk").
+ */
+export function bankFor(
+  industry: string,
+  marineBusinessTypes?: string[] | string | null,
+): Record<string, string> | null {
   if (industry === "boat_club") return SCENE_BANK.boat_club!;
-  if (industry === "marina" && marineBusinessType && SCENE_BANK[marineBusinessType]) {
-    return SCENE_BANK[marineBusinessType]!;
+  if (industry !== "marina") return null;
+
+  const services = (
+    Array.isArray(marineBusinessTypes)
+      ? marineBusinessTypes
+      : marineBusinessTypes
+        ? [marineBusinessTypes]
+        : []
+  ).filter((s) => SCENE_BANK[s]);
+
+  if (services.length === 0) return null;
+  if (services.length === 1) return SCENE_BANK[services[0]!]!;
+
+  const merged: Record<string, string> = {};
+  for (const service of services) {
+    for (const [id, text] of Object.entries(SCENE_BANK[service]!)) {
+      merged[`${service}:${id}`] = text;
+    }
   }
-  return null;
+  return merged;
+}
+
+/** The service that selects the prompt template — the primary. */
+export function primaryService(marineBusinessTypes?: string[] | string | null): string | null {
+  if (Array.isArray(marineBusinessTypes)) return marineBusinessTypes[0] ?? null;
+  return marineBusinessTypes ?? null;
 }
 
 /**

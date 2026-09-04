@@ -70,7 +70,7 @@ export const ClientFormSchema = z
   .object({
     name: z.string().trim().min(1, "Client name is required"),
     industry: z.enum(INDUSTRIES),
-    marine_business_type: z.enum(MARINE_BUSINESS_TYPES).optional().or(z.literal("")),
+    marine_business_types: z.array(z.enum(MARINE_BUSINESS_TYPES)).default([]),
     special_ad_category: z.enum(SPECIAL_AD_CATEGORIES).default("none"),
     meta_business: z.string().trim().default(""),
     location_description: z.string().trim().default(""),
@@ -87,11 +87,11 @@ export const ClientFormSchema = z
     tone_keywords: z.string().trim().default(""),
     current_promotion: z.string().trim().default(""),
   })
-  // A marina without a subtype falls through to the generic prompt and quietly
+  // A marina with no service falls through to the generic prompt and quietly
   // produces worse creative, so the database rejects it and so does the form.
-  .refine((v) => v.industry !== "marina" || Boolean(v.marine_business_type), {
-    message: "Marina business type is required — it selects the prompt and scene bank",
-    path: ["marine_business_type"],
+  .refine((v) => v.industry !== "marina" || v.marine_business_types.length > 0, {
+    message: "Pick at least one service — they select the prompt and the scenes",
+    path: ["marine_business_types"],
   });
 
 export type ClientFormValues = z.input<typeof ClientFormSchema>;

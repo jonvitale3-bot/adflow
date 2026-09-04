@@ -9,7 +9,31 @@ function normalize(values: Record<string, unknown>) {
   for (const [k, v] of Object.entries(values)) {
     out[k] = typeof v === "string" && v.trim() === "" ? null : v;
   }
+  // The scalar column carries the primary service, so existing reads and the
+  // prompt template keep working while the array holds the full set.
+  const services = values.marine_business_types as string[] | undefined;
+  out.marine_business_type = services?.[0] ?? null;
   return out;
+}
+
+/** The full record. The list only selects the columns it renders, so the edit
+ *  panel must load the rest or a save would write nulls over them. */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  return NextResponse.json({ client: data });
 }
 
 export async function PATCH(

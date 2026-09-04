@@ -97,3 +97,29 @@ test("scene text reaches the prompt when supplied", () => {
   const p = buildImagePrompt({ ...base, sceneText: BOAT_CLUB_SCENES.cruising });
   assert.match(p, /V-shaped wake/);
 });
+
+test("a multi-service marina draws scenes from every service it offers", () => {
+  const single = bankFor("marina", ["boat_rentals"]);
+  const multi = bankFor("marina", ["boat_rentals", "wet_slips"]);
+
+  assert.ok(single && multi);
+  assert.ok(
+    Object.keys(multi!).length > Object.keys(single!).length,
+    "adding a service must add its scenes",
+  );
+
+  // Ids are namespaced, because several banks define "dock_walk".
+  assert.ok(Object.keys(multi!).every((id) => id.includes(":")));
+  assert.ok(Object.keys(multi!).some((id) => id.startsWith("boat_rentals:")));
+  assert.ok(Object.keys(multi!).some((id) => id.startsWith("wet_slips:")));
+});
+
+test("a single-service marina keeps plain scene ids", () => {
+  const bank = bankFor("marina", ["wet_slips"]);
+  assert.ok(bank && Object.keys(bank).every((id) => !id.includes(":")));
+});
+
+test("a marina with no service still has no scenes", () => {
+  assert.equal(bankFor("marina", []), null);
+  assert.equal(bankFor("marina", null), null);
+});
