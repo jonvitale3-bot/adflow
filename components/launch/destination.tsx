@@ -42,7 +42,9 @@ export function DestinationPicker({
 }) {
   const [campaigns, setCampaigns] = useState<Option[]>([]);
   const [adSets, setAdSets] = useState<Option[]>([]);
-  const [instagram, setInstagram] = useState<Array<{ id: string; username?: string }>>([]);
+  const [instagram, setInstagram] = useState<
+    Array<{ id: string; username?: string; pageBacked?: boolean }>
+  >([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -171,14 +173,21 @@ export function DestinationPicker({
       <Select
         label="Instagram account"
         value={value.instagramId}
-        hint="Optional. Ads still run on Facebook without one."
+        hint={
+          value.instagramId
+            ? "Ads run on Instagram as this identity."
+            : "Optional, but without one the ad cannot run on Instagram at all, so a vertical size will only serve Facebook stories."
+        }
         onChange={(e) => onChange({ ...value, instagramId: e.target.value })}
       >
         {/* Empty string, not the string "none" — the old build sent the literal
             word to Meta, which rejected it. */}
         <option value="">Facebook only</option>
         {instagram.map((ig) => (
-          <option key={ig.id} value={ig.id}>{ig.username ? `@${ig.username}` : ig.id}</option>
+          <option key={ig.id} value={ig.id}>
+            {ig.username ? `@${ig.username}` : ig.id}
+            {ig.pageBacked ? " (via the Facebook Page)" : ""}
+          </option>
         ))}
       </Select>
     </div>

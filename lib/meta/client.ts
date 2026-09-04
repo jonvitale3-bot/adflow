@@ -162,6 +162,13 @@ export function listAdSets(campaignId: string, business?: string | null): Promis
 export interface InstagramAccount {
   id: string;
   username?: string;
+  /**
+   * A Page-backed Instagram account: the stand-in Meta uses so a Facebook Page
+   * can represent the business on Instagram when there is no real Instagram
+   * account. Worth labelling, because it is not an account anyone can post
+   * from.
+   */
+  pageBacked?: boolean;
 }
 
 /**
@@ -200,6 +207,22 @@ export async function listInstagramAccounts(
         instagram_business_account?: InstagramAccount;
       }>(url(pageId, { fields: "instagram_business_account{id,username}" }), { business });
       return body.instagram_business_account ? [body.instagram_business_account] : [];
+    });
+
+    // The Page-backed account, which is what Meta falls back to on its own
+    // when an ad runs on Instagram with only a Page behind it. It is the
+    // identity that appears on the draft in Ads Manager, and without naming it
+    // a creative cannot claim an Instagram placement at all. Listed last, so a
+    // real Instagram account is preferred where one exists.
+    sources.push(async () => {
+      const rows = await paginate<InstagramAccount>(
+        url(`${pageId}/page_backed_instagram_accounts`, {
+          fields: "id,username",
+          limit: "25",
+        }),
+        business,
+      );
+      return rows.map((row) => ({ ...row, pageBacked: true }));
     });
   }
 
