@@ -27,11 +27,31 @@ test("boat club prompt carries the bans that define the product", () => {
   const p = buildSystemPrompt(input());
   assert.match(p, /NEVER compare cost of membership vs\. cost of boat ownership/);
   assert.match(p, /Never use vague social proof numbers/);
-  assert.match(p, /Maximum 7 lines total/);
-  assert.match(p, /Maximum 10 words per line/);
-  assert.match(p, /BANNED line 5 patterns/);
+  assert.match(p, /under 90 words/);
+  assert.match(p, /Adventure awaits/);
   assert.match(p, /NEVER use the words "click", "tap", "instant access"/);
   assert.match(p, /4-6 words, plain English/);
+});
+
+test("the prompt teaches flow, not a line-by-line form", () => {
+  const p = buildSystemPrompt(input());
+  // The old prompt assigned each line a job and banned commas between ideas,
+  // which is what made every ad read as a stack of clipped fragments.
+  assert.doesNotMatch(p, /Line 1:/);
+  assert.doesNotMatch(p, /Periods used to separate ideas within a line/);
+  assert.doesNotMatch(p, /Maximum 10 words per line/);
+  assert.match(p, /ONE argument per ad/);
+  assert.match(p, /Vary sentence length/);
+  assert.match(p, /Connect the ideas/);
+});
+
+test("the example the model imitates is written as prose, not fragments", () => {
+  const p = buildSystemPrompt(input());
+  // Whatever else the prompt says, the model copies the exemplar. It has to
+  // contain connective grammar rather than a run of full stops.
+  const example = /One membership, and the boat is ready when you are[\s\S]*?See membership options near you/.exec(p);
+  assert.ok(example, "the boat club exemplar is missing");
+  assert.match(example[0], /—|, so |, and /);
 });
 
 test("non-boat-club industries get the generic prompt, not the boat club one", () => {
@@ -40,7 +60,8 @@ test("non-boat-club industries get the generic prompt, not the boat club one", (
   assert.doesNotMatch(p, /cost of boat ownership/);
   assert.match(p, /BUSINESS: Glow Med Spa/);
   // Shared rules must still be present.
-  assert.match(p, /Maximum 7 lines total/);
+  assert.match(p, /under 90 words/);
+  assert.match(p, /ONE argument per ad/);
   assert.match(p, /NEVER use the words "click", "tap"/);
 });
 

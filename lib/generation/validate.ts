@@ -24,8 +24,11 @@ const MONTHS = [
   "july", "august", "september", "october", "november", "december",
 ];
 
-/** Vague motivational filler explicitly banned from line 5. */
-const BANNED_LINE_5 = [
+/**
+ * Vague motivational filler. Banned anywhere in the ad, not at a fixed line:
+ * copy is written as paragraphs now, so there is no "line 5" to police.
+ */
+const BANNED_FILLER = [
   "the water is calling",
   "don't watch another weekend pass",
   "stop planning. start boating",
@@ -66,14 +69,18 @@ export function validateVariation(v: AdVariation): CopyWarning[] {
     });
   }
 
-  for (const [i, line] of lines.entries()) {
-    const words = line.trim().split(/\s+/).length;
-    if (words > 10) {
-      warnings.push({
-        rule: "line_length",
-        detail: `Line ${i + 1} is ${words} words; the maximum is 10.`,
-      });
-    }
+  // Total length, not per-line length.
+  //
+  // A per-line word cap was the rule here, and it was the thing making every
+  // ad read as a stack of clipped fragments: a sentence that carries an idea
+  // into the next one is usually longer than ten words. What actually matters
+  // is that the ad is short enough to read, which is a whole-text property.
+  const totalWords = v.primary_text.trim().split(/\s+/).filter(Boolean).length;
+  if (totalWords > 90) {
+    warnings.push({
+      rule: "primary_text_length",
+      detail: `${totalWords} words; keep it under 90 so it is not all behind "... more".`,
+    });
   }
 
   // The CTA is the last non-empty line.
@@ -104,12 +111,11 @@ export function validateVariation(v: AdVariation): CopyWarning[] {
     });
   }
 
-  const lineFive = lines[4]?.toLowerCase() ?? "";
-  for (const phrase of BANNED_LINE_5) {
-    if (lineFive.includes(phrase)) {
+  for (const phrase of BANNED_FILLER) {
+    if (lower.includes(phrase)) {
       warnings.push({
-        rule: "line_5_platitude",
-        detail: `Line 5 is motivational filler ("${phrase}"); it must be concrete.`,
+        rule: "platitude",
+        detail: `Motivational filler ("${phrase}"); the ad needs something concrete instead.`,
       });
     }
   }

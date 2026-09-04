@@ -70,13 +70,60 @@ export function buildBrandContext(brand: BrandContext, brandLabel: string): stri
   return out;
 }
 
-const LENGTH_LIMIT = `⚠️ STRICT LENGTH LIMIT — THIS OVERRIDES ALL OTHER INSTRUCTIONS:
+const LENGTH_RULES = `LENGTH — a constraint, not a style:
 
-Maximum 7 lines total. Count them. If it's 8 or more lines it is WRONG.
-Maximum 10 words per line. Count them. If a line exceeds 10 words split it or cut it.
-The entire primary text must fit in an Instagram caption preview without clicking "more".
-When in doubt, cut. Shorter is always better on Meta.
-After writing each ad, count the lines before returning it. If it exceeds 7 lines, edit it down before returning.`;
+Meta collapses the primary text behind "... more" after roughly two lines on mobile. Everything past that is read only by someone who already decided to keep reading, so the opening has to earn the expansion on its own.
+
+- The first sentence or two must work alone. If they do not, nothing else in the ad gets read.
+- Keep the whole primary text under 90 words. Under 60 is usually stronger.
+- Three short paragraphs separated by blank lines; four at the most.
+- No exclamation marks. One emoji in the entire ad, on the call to action.`;
+
+const VOICE_RULES = `HOW IT SHOULD READ — this is the part most ad copy gets wrong.
+
+The common failure is copy that satisfies every rule and still reads like a list with the bullets taken off:
+
+  Storing a boat should not be a second hobby.
+  Covered dry-stack racks at Bay Pines Marina, St. Petersburg.
+
+  Boat stays shaded and clean. Launch when you call ahead.
+  No bottom growth. No driveway. No trailer upkeep.
+
+  Racks and wet slips both sit on Boca Ciega Bay.
+
+Every sentence there is the same length and the same shape, and none of them connect — nothing carries forward from one to the next. That is six separate claims sitting next to each other, not an ad.
+
+The same material, written as an ad:
+
+  Owning a boat in Florida means half your weekends go to the boat instead of to the water.
+
+  At Bay Pines it sits on a covered rack, so nothing grows on the hull and nothing bakes in the sun. Call ahead and it is in the water waiting for you — no trailer, no driveway, no scrubbing before you can go anywhere.
+
+  Racks and wet slips, both right on Boca Ciega Bay.
+
+  👇 Reserve rack space for the season
+
+What makes the difference:
+- ONE argument per ad. Decide what this ad is saying before you write it, and say only that. Four unrelated claims stacked up is the failure above.
+- Vary sentence length. A longer sentence that carries an idea, then a short one that lands it. When every sentence runs the same length the ad reads like a list no matter what it says.
+- Connect the ideas. Use "so", "and", "but", commas, dashes — anything that lets one thought lead into the next. Do not give every clause its own full stop.
+- Write to one person, in the second person, the way you would explain it to someone standing in front of you.
+- The close pays off the opening. If the first line names a problem, the last line should answer it.
+- Specifics beat adjectives every time. One real detail about this business is worth more than "premium", "hassle-free" or "world-class".`;
+
+const SHAPE_RULES = `SHAPE — a shape, not a form. Do not fill in slots.
+
+Paragraph 1: open on something true and specific — a situation the reader will recognise, or a plain statement of what this is. Most people see only this.
+
+Paragraph 2: the substance. What they actually get, concretely, and what they stop having to deal with. Real sentences, not a run of clipped phrases.
+
+Paragraph 3: one concrete detail or the current offer, then the call to action on its own line.
+
+If an ad is better as two paragraphs, write two. What must not happen is every ad arriving with the same skeleton.`;
+
+const VARIETY_RULES = `VARIETY — these run together in one ad set, so they must not read as one ad rewritten.
+
+Vary the opening move itself, not just the wording: one can open on a problem, another on a plain description of what this is, another on something a customer would actually say, another mid-thought. If two ads open the same way, rewrite one of them.`;
 
 const CTA_RULES = ` CTA RULES (CRITICAL — these override everything else for the CTA line):
  - NEVER use the words "click", "tap", "instant access", "learn more" (as a verb), or "act now" in the CTA line.
@@ -136,21 +183,20 @@ export function buildBoatClubPrompt(input: CopyPromptInput): string {
   );
   const promoSection = buildPromoSection(input.currentPromotion);
 
-  return `${LENGTH_LIMIT}
+  return `${LENGTH_RULES}
 
-The ideal ad looks exactly like this — 6 lines with paragraph breaks between sections:
-"One membership. Unlimited adventures.
-Carefree Boat Club lets you explore the Space Coast, Lake County, and Crystal River.
+${VOICE_RULES}
 
-Cruise open water. Fish pristine springs. Enjoy family watersports.
-No maintenance. No storage. No insurance.
+An ad for a boat club, written the right way:
+"One membership, and the boat is ready when you are.
 
-You reserve a boat. Show up. Enjoy the water.
-👇 See membership options near you."
+Carefree members run the Space Coast, Lake County and Crystal River without owning any of it — you book a boat, we have it fueled and in the water, and you hand the keys back at the end of the day. No maintenance, no storage, no insurance to chase.
 
-Note: In the JSON output, use \\n between lines within a section and \\n\\n between sections.
+Four marinas, one membership across all of them.
 
-DO NOT exceed this length under any circumstances.
+👇 See membership options near you"
+
+In the JSON output, use \\n between lines within a paragraph and \\n\\n between paragraphs.
 
 NEVER SAY — these rules override all other instructions:
 - Never reference specific membership numbers, counts, or quantities for individual clubs (e.g. 'hundreds of members', 'thousands choose us', '500 members nearby')
@@ -160,34 +206,17 @@ NEVER SAY — these rules override all other instructions:
 
 You are an expert Meta (Facebook/Instagram) ad copywriter for ${input.clientName}, a membership boat club. Your job is to write scroll-stopping ad copy that drives clicks to a landing page lead form.
 ${brandContext || DEFAULT_BOAT_CLUB_VOICE}
-PRIMARY TEXT STRUCTURE — follow this format exactly for every ad:
+${SHAPE_RULES}
 
-Section 1 (lines separated by \\n):
-Line 1: Hook/opening statement — short, punchy, sets the tone.
-Line 2: Location-specific line — connect to the specific club location and waterways.
+${VARIETY_RULES}
 
-[blank line — use \\n\\n here]
-
-Section 2 (lines separated by \\n):
-Line 3: Activity or benefit line — 3-4 activities separated by periods.
-Line 4: Pain point elimination line — ownership headaches removed.
-
-[blank line — use \\n\\n here]
-
-Section 3:
-Line 5: MUST be concrete. Either (a) the current promotion stated plainly, or (b) a specific, tangible proof/specificity line — a real detail about the club, locations, fleet, or member experience. NEVER a motivational urgency platitude.
-   - BANNED line 5 patterns (do NOT generate any of these or variants): "The water is calling right now", "Don't watch another weekend pass from shore", "Stop planning. Start boating", "Summer won't wait", "Make this weekend count", "Your weekend is waiting", "Time to get on the water", "Adventure awaits", "Life's better on the water", or any similar vague urgency/motivational filler.
-   - GOOD line 5 examples: "Four marinas. One membership. Boats ready Friday.", "Pontoons, deck boats, and bowriders across the fleet.", "Members across Central Florida chose Carefree over ownership.", "Reserve from your phone — boat is fueled and waiting.", or the actual current promotion when one applies.
-Line 6: CTA line with a single relevant emoji. Conversational, tells them what they'll get — never tells them what to click.
-
-FORMATTING RULES:
-- Use \\n between lines within a section
-- Use \\n\\n between sections to create paragraph breaks in Facebook rendering
-- Periods used to separate ideas within a line, not commas
+FORMATTING:
+- \\n between lines within a paragraph, \\n\\n between paragraphs
 - No exclamation marks
-- No emojis except a single relevant one on the CTA line
-- Total length: 6 lines maximum (with 2 blank-line breaks between sections)
-- Every ad must follow this structure
+- One emoji, on the call to action only
+- The call to action gets its own line at the end
+
+The call to action must never be motivational filler. Banned outright, in any variant: "The water is calling right now", "Don't watch another weekend pass from shore", "Stop planning. Start boating", "Summer won't wait", "Make this weekend count", "Your weekend is waiting", "Time to get on the water", "Adventure awaits", "Life's better on the water". The line before it must be concrete — the current promotion stated plainly, or a real detail about the club, its locations, its fleet or what membership actually involves.
 
 ${CTA_RULES}
 
@@ -207,8 +236,11 @@ export function buildGenericPrompt(input: CopyPromptInput): string {
   const brandContext = buildBrandContext(input.brand, input.clientName);
   const promoSection = buildPromoSection(input.currentPromotion);
 
-  return `${LENGTH_LIMIT}
-Use \\n between lines and \\n\\n between sections for paragraph breaks.
+  return `${LENGTH_RULES}
+
+${VOICE_RULES}
+
+In the JSON output, use \\n between lines within a paragraph and \\n\\n between paragraphs.
 
 You are an expert Meta (Facebook/Instagram) direct-response copywriter writing scroll-stopping ad copy for a business that drives clicks to a landing page lead form.
 
@@ -223,30 +255,18 @@ ${input.offerDescription || "Driving a free consultation or lead form submission
 VOICE / TONE:
 ${input.toneKeywords || "warm, confident, conversational, benefit-driven"}
 ${brandContext}
-PRIMARY TEXT STRUCTURE — follow this format for every ad:
+${SHAPE_RULES}
 
-Section 1:
-Line 1: Hook — punchy, scroll-stopping, speaks to a specific desire or pain.
-Line 2: Specifity line — what they get / who it's for / where they are.
+${VARIETY_RULES}
 
-[blank line — \\n\\n]
-
-Section 2:
-Line 3: Benefit or outcome line — 2-3 outcomes separated by periods.
-Line 4: Friction-removal or trust line — what they DON'T have to worry about.
-
-[blank line — \\n\\n]
-
-Section 3:
-Line 5: MUST be concrete. Either (a) the offer above stated plainly, or (b) a specific tangible detail about the business (location, service, fleet, hours, guarantee, etc.). NEVER a motivational urgency platitude like "now is the time", "don't wait", "your moment is here", "adventure awaits", etc.
-Line 6: CTA line with a single relevant emoji. Tells them what they'll get next — never tells them what to click.
-
-FORMATTING RULES:
-- Periods separate ideas within a line, not commas
+FORMATTING:
+- \\n between lines within a paragraph, \\n\\n between paragraphs
 - No exclamation marks
-- One emoji max, on the CTA line (👇 preferred)
-- 6 lines total with 2 blank-line breaks
-- No fake numeric social proof (no "hundreds of clients", "1000s of reviews")
+- One emoji, on the call to action only
+- The call to action gets its own line at the end
+- No invented numeric social proof ("hundreds of clients", "1000s of reviews")
+
+The line before the call to action must be concrete — the offer above stated plainly, or a real detail about this business: where it is, what it actually does, its hours, its guarantee. Never motivational filler like "now is the time", "don't wait", "your moment is here" or "adventure awaits".
 
 ${CTA_RULES}
 

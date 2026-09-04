@@ -28,9 +28,18 @@ test("headline outside 4-6 words is flagged", () => {
   );
 });
 
-test("a line over 10 words is flagged", () => {
-  const long = v({ primary_text: "one two three four five six seven eight nine ten eleven" });
-  assert.ok(rules(validateVariation(long)).includes("line_length"));
+test("a sentence that carries an idea is not a rule violation", () => {
+  // The per-line word cap used to flag this. It is the shape good copy takes.
+  const flowing = v({
+    primary_text:
+      "Owning a boat in Florida means half your weekends go to the boat instead of to the water.\n\n👇 Reserve rack space for the season",
+  });
+  assert.deepEqual(rules(validateVariation(flowing)), []);
+});
+
+test("an ad too long to read before \"... more\" is flagged", () => {
+  const long = v({ primary_text: Array.from({ length: 95 }, () => "word").join(" ") });
+  assert.ok(rules(validateVariation(long)).includes("primary_text_length"));
 });
 
 test("more than 7 lines is flagged", () => {
@@ -62,11 +71,15 @@ test("qualitative social proof is NOT flagged", () => {
   assert.ok(!rules(validateVariation(ok)).includes("numeric_social_proof"));
 });
 
-test("line 5 motivational filler is flagged", () => {
-  const bad = v({
-    primary_text: "a b c.\nd e f.\n\ng h i.\nj k l.\n\nAdventure awaits\n👇 Join now today",
-  });
-  assert.ok(rules(validateVariation(bad)).includes("line_5_platitude"));
+test("motivational filler is flagged wherever it appears", () => {
+  // It used to be policed only at line 5, which no longer exists now that copy
+  // is written as paragraphs rather than a six-slot form.
+  for (const text of [
+    "Adventure awaits.\n👇 Join now today",
+    "a b c.\nd e f.\n\ng h i.\nj k l.\n\nAdventure awaits\n👇 Join now today",
+  ]) {
+    assert.ok(rules(validateVariation(v({ primary_text: text }))).includes("platitude"), text);
+  }
 });
 
 test("cost-vs-ownership comparison is boat-club only", () => {
