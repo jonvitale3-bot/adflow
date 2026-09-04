@@ -238,9 +238,9 @@ export function DestinationPicker({
             Instagram identity or every lookup failed. It says which now. */}
         {instagram.length === 0 && igAttempts.length > 0 && (
           <div className="mt-1.5 rounded-md border border-border bg-surface-muted px-2.5 py-2">
-            <p className="text-[12px] text-text-secondary">
+            <p className="text-[12px] leading-[1.5] text-text-secondary">
               {igAttempts.every((a) => a.ok)
-                ? "This Page has no Instagram identity yet. Meta makes one the first time an ad needs it, but a per-placement ad has to name it up front."
+                ? "No Instagram identity is visible to this token. That does not mean there is none: an Instagram account is a separate asset in Business Settings, and a system user has to be assigned to it the same way it is assigned to Pages and ad accounts. If Ads Manager shows a profile on these ads, assign that account to the system user, or paste its id below."
                 : "Meta could not be asked for this client's Instagram identity."}
             </p>
 
@@ -260,9 +260,10 @@ export function DestinationPicker({
                 className="mt-2"
                 disabled={creatingIg}
                 onClick={createPageBackedIg}
-                title="Creates a Page-backed Instagram account on this client's Facebook Page. It is used only by ads and nobody posts from it."
+                variant="ghost"
+                title="Only if this client genuinely has no Instagram account. Creates a Page-backed stand-in on the Facebook Page, which ads then run as instead of the real profile."
               >
-                {creatingIg ? "Creating…" : "Create one from the Page"}
+                {creatingIg ? "Creating…" : "No account exists: create a stand-in"}
               </Button>
             )}
 
