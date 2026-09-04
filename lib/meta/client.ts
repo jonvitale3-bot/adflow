@@ -237,6 +237,16 @@ export async function listInstagramAccounts(
           business,
         ),
     },
+    // The newer edge. The one above predates it and is empty on accounts where
+    // the identity was linked through Business settings rather than the Page.
+    {
+      name: "ad account connected_instagram_accounts",
+      run: () =>
+        paginate<InstagramAccount>(
+          url(`${acct}/connected_instagram_accounts`, { fields: "id,username", limit: "100" }),
+          business,
+        ),
+    },
   ];
 
   // Fetched once and shared: the Page edges below refuse the system user token.
@@ -270,6 +280,22 @@ export async function listInstagramAccounts(
     // identity that appears on the draft in Ads Manager, and without naming it
     // a creative cannot claim an Instagram placement at all. Listed last, so a
     // real Instagram account is preferred where one exists.
+    // What Ads Manager itself shows under "Instagram profile": the account
+    // connected to the Page for advertising. It is a separate edge from the
+    // Page's own Instagram accounts, and a Page can have this and nothing else.
+    sources.push({
+      name: "page connected_instagram_account",
+      run: async () => {
+        const body = await request<{
+          connected_instagram_account?: InstagramAccount;
+        }>(url(pageId, { fields: "connected_instagram_account{id,username}" }), {
+          business,
+          token: pageToken ?? undefined,
+        });
+        return body.connected_instagram_account ? [body.connected_instagram_account] : [];
+      },
+    });
+
     sources.push({
       name: "page_backed_instagram_accounts",
       run: async () => {

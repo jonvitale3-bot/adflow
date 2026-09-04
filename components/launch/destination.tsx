@@ -247,7 +247,9 @@ export function DestinationPicker({
             <ul className="mt-1.5 space-y-0.5">
               {igAttempts.map((a) => (
                 <li key={a.source} className="font-mono text-[11px] text-text-tertiary">
-                  {a.ok ? `○ ${a.source}: none` : `! ${a.source}: ${a.error}`}
+                  {a.ok
+                    ? `○ ${a.source}: ${a.found === 0 ? "none" : `${a.found} found`}`
+                    : `! ${a.source}: ${a.error}`}
                 </li>
               ))}
             </ul>
