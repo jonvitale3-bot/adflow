@@ -471,7 +471,8 @@ export function LaunchView({
                 pushedCount={pushed.length}
                 onPush={(ids) => runJob("push", ids)}
                 onReject={(ids) => runJob("reject", ids)}
-                onRefresh={refresh}
+                industry={client?.industry ?? ""}
+          onRefresh={refresh}
           onDiscard={discard}
                 onPair={pairNow}
               />

@@ -6,6 +6,7 @@ import { PreviewDialog } from "@/components/launch/preview-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { validateBoatClubVariation, validateVariation } from "@/lib/generation/validate";
 
 export interface Variation {
   id: string;
@@ -33,6 +34,7 @@ export function ReviewGrid({
   progress,
   canPush,
   pushedCount,
+  industry,
   onPush,
   onReject,
   onRefresh,
@@ -44,6 +46,7 @@ export function ReviewGrid({
   progress: { completed: number; total: number } | null;
   canPush: boolean;
   pushedCount: number;
+  industry: string;
   onPush: (ids: string[]) => void;
   onReject: (ids: string[]) => void;
   onRefresh: () => void;
@@ -52,6 +55,11 @@ export function ReviewGrid({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewing, setPreviewing] = useState<string | null>(null);
+
+  // The copy rules are pure functions, so they run here against whatever is on
+  // screen rather than being computed once at generation and thrown away. That
+  // also covers imported copy and stays current when a rule changes.
+  const validate = industry === "boat_club" ? validateBoatClubVariation : validateVariation;
 
   const drafts = variations.filter((v) => v.status === "draft");
   const pushed = variations.filter((v) => v.status === "pushed");
@@ -185,6 +193,7 @@ export function ReviewGrid({
       <ul className="grid gap-4 p-5 md:grid-cols-2">
         {shown.map((v) => {
           const isSelected = selected.has(v.id);
+          const warnings = validate({ headline: v.headline, primary_text: v.primary_text });
           return (
             <li key={v.id}>
               <article
@@ -233,6 +242,16 @@ export function ReviewGrid({
                     </p>
                   </div>
                 </div>
+
+                {warnings.length > 0 && (
+                  <ul className="border-t border-border bg-warning-subtle px-3 py-2">
+                    {warnings.map((w) => (
+                      <li key={w.rule + w.detail} className="text-[11px] leading-[1.45] text-warning-on-subtle">
+                        ▲ {w.detail}
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 {(v.status === "failed" || v.meta_ad_id) && (
                   <div className="border-t border-border px-3 py-2">

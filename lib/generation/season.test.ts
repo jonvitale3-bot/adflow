@@ -92,6 +92,6 @@ test("promo section is omitted entirely when there is no promotion", () => {
 test("promo section carries the 30% instruction and the do-not-paste rule", () => {
   const out = buildPromoSection("$500 off initiation this month");
   assert.match(out, /approximately 30%/);
-  assert.match(out, /do not just paste it in mechanically/);
+  assert.match(out, /Do not just paste it in mechanically/);
   assert.ok(out.includes("$500 off initiation this month"));
 });

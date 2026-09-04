@@ -51,7 +51,20 @@ test("the example the model imitates is written as prose, not fragments", () => 
   // contain connective grammar rather than a run of full stops.
   const example = /One membership, and the boat is ready when you are[\s\S]*?See membership options near you/.exec(p);
   assert.ok(example, "the boat club exemplar is missing");
-  assert.match(example[0], /—|, so |, and /);
+  assert.match(example[0], /, so |, and /);
+});
+
+test("the prompt contains no dash it tells the model not to use", () => {
+  // The model imitates the prose it is given far more reliably than it obeys a
+  // rule stated once, so a prompt that bans em dashes while using them in its
+  // own headings gets em dashes back.
+  for (const p of [buildSystemPrompt(input()), buildSystemPrompt(input({ industry: "marina" }))]) {
+    const offenders = p
+      .split("\n")
+      .filter((line) => /[\u2013\u2014]/.test(line))
+      .filter((line) => !line.includes("NEVER use an em dash"));
+    assert.deepEqual(offenders, [], "the prompt uses the punctuation it forbids");
+  }
 });
 
 test("non-boat-club industries get the generic prompt, not the boat club one", () => {
@@ -131,7 +144,7 @@ test("image pairing appears in the user message, numbered in order", () => {
 
 test("a variation with no image is told to stand alone", () => {
   const msg = buildUserMessage(input({ pairedImages: ["A dock at sunset", null] }));
-  assert.match(msg, /2\. \(no image — write it standalone\)/);
+  assert.match(msg, /2\. \(no image, write it standalone\)/);
 });
 
 test("no image descriptions means no pairing section at all", () => {

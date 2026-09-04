@@ -49,7 +49,13 @@ const COST_COMPARISON = [
   "3x more",
 ];
 
-export function validateVariation(v: AdVariation): CopyWarning[] {
+/**
+ * Only the text is checked, so the parameter is only the text: callers include
+ * the review grid, which holds saved rows rather than freshly parsed output.
+ */
+type Checkable = Pick<AdVariation, "headline" | "primary_text">;
+
+export function validateVariation(v: Checkable): CopyWarning[] {
   const warnings: CopyWarning[] = [];
   const lines = v.primary_text.split("\n").filter((l) => l.trim().length > 0);
   const lower = v.primary_text.toLowerCase();
@@ -124,11 +130,23 @@ export function validateVariation(v: AdVariation): CopyWarning[] {
     warnings.push({ rule: "exclamation", detail: "Contains an exclamation mark." });
   }
 
+  // A house rule, and one the model will break given half a chance: dashes are
+  // its favourite way to join two thoughts. The prompt bans them and contains
+  // none itself; this catches what still slips through.
+  for (const [char, name] of [
+    ["\u2014", "em dash"],
+    ["\u2013", "en dash"],
+  ] as const) {
+    if (v.primary_text.includes(char) || v.headline.includes(char)) {
+      warnings.push({ rule: "dash", detail: `Contains an ${name} (${char}); rewrite it.` });
+    }
+  }
+
   return warnings;
 }
 
 /** Boat-club only: cost-vs-ownership comparison is banned outright. */
-export function validateBoatClubVariation(v: AdVariation): CopyWarning[] {
+export function validateBoatClubVariation(v: Checkable): CopyWarning[] {
   const warnings = validateVariation(v);
   const lower = v.primary_text.toLowerCase();
 

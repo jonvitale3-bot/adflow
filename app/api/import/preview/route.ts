@@ -81,7 +81,6 @@ export async function POST(request: Request) {
     warnings: validateVariation({
       headline: row.headline,
       primary_text: row.primary_text,
-      angle: "lifestyle",
     }),
   }));
 

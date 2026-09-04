@@ -96,3 +96,16 @@ test("exclamation marks are flagged", () => {
       .includes("exclamation"),
   );
 });
+
+test("a dash is flagged wherever it appears", () => {
+  const inBody = v({ primary_text: "Call ahead \u2014 the boat is waiting.\n\u2028👇 Reserve a rack" });
+  assert.ok(rules(validateVariation(inBody)).includes("dash"));
+
+  const inHeadline = v({ headline: "Dry Storage \u2013 No Hassle" });
+  assert.ok(rules(validateVariation(inHeadline)).includes("dash"));
+});
+
+test("an ordinary hyphen is not a dash", () => {
+  const fine = v({ primary_text: "Full-service marina, dry-stack racks.\n👇 Reserve a rack" });
+  assert.ok(!rules(validateVariation(fine)).includes("dash"));
+});

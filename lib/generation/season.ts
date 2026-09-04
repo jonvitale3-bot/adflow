@@ -14,7 +14,7 @@ export type SeasonType = "seasonal" | "year_round";
  * to anyone who sees the ad in July that was written in June.
  */
 function neverNameMonth(monthName: string): string {
-  return `NEVER name a specific month (no "${monthName}", "July", "August", "this month", etc.) — copy may run into the next month and go stale. Use "this weekend", "right now", "this summer", or "the season" instead.`;
+  return `NEVER name a specific month (no "${monthName}", "July", "August", "this month", etc.). Copy may run into the next month and go stale. Use "this weekend", "right now", "this summer", or "the season" instead.`;
 }
 
 /**
@@ -45,17 +45,17 @@ export function buildSeasonalSection(
   if (seasonType === "year_round") {
     // Florida, Texas, Arizona, SoCal. There is no off-season, so seasonal
     // urgency framing reads as nonsense to the audience.
-    note = `THIS CLUB IS IN A YEAR-ROUND BOATING MARKET. The water is good all 12 months — there is no off-season here.
+    note = `THIS CLUB IS IN A YEAR-ROUND BOATING MARKET. The water is good all 12 months, and there is no off-season here.
 DO NOT use seasonal urgency framing. Specifically AVOID: "this summer", "summer is happening", "by July it's gone", "before summer slips away", "the season is here", "lock in before summer", "pre-season", "spring ramp", "get ready for next season", "don't watch another summer pass". ${NEVER_NAME_MONTH}
 Instead, drive urgency through: lifestyle FOMO ("members are out on the water this weekend"), weekend transformation ("turn this Saturday into something memorable"), simplicity ("stop researching, start cruising"), and the current promotion when applicable.
-The angle rotation still applies, but the FOMO and WEEKEND angles should reference *this weekend* / *next weekend* / *right now* — never *this summer* or a calendar season or a specific month.`;
+The angle rotation still applies, but the FOMO and WEEKEND angles should reference *this weekend* / *next weekend* / *right now*, never *this summer* or a calendar season or a specific month.`;
   } else if (month >= 4 && month <= 7) {
     note = `PEAK BOATING SEASON IS HAPPENING RIGHT NOW.
 Every ad must feel time-sensitive. The water is warm, the weekends are booking up, and members are already out on the boats.
-Lean hard into FOMO and lifestyle urgency. The cost of waiting is missing this summer entirely (frame as missed memories/weekends — never as dollars).
+Lean hard into FOMO and lifestyle urgency. The cost of waiting is missing this summer entirely (frame as missed memories/weekends, never as dollars).
 Use phrases like: "this summer", "this weekend", "the season is here", "don't watch another summer pass", "members are already out", "by the time you decide, the season is gone".
 ${NEVER_NAME_MONTH}
-At least 60% of variations should use the fomo or weekend angle. Every ad — regardless of angle — should carry a subtle "the time is now" undertone.
+At least 60% of variations should use the fomo or weekend angle. Every ad, regardless of angle, should carry a subtle "the time is now" undertone.
 Do NOT use winter, spring-prep, or "get ready for next season" framing. The season is HERE.`;
   } else if (month >= 8 && month <= 9) {
     note = `LATE BOATING SEASON. Lean into "still warm, still on the water" + "lock in before next summer fills up" urgency. ${NEVER_NAME_MONTH}`;
@@ -80,8 +80,8 @@ CURRENT PROMOTION FOR THIS CLUB:
 ${currentPromotion}
 
 Important: Include this promotion naturally in approximately 30% of the generated ad variations.
-Weave it into the copy as an urgency/value driver — do not just paste it in mechanically.
+Weave it into the copy as an urgency/value driver. Do not just paste it in mechanically.
 Example: "Right now, new members save big on entry. Limited time."
-Do not include the promotion in every ad — only where it fits naturally as a hook or closing line.
+Do not include the promotion in every ad, only where it fits naturally as a hook or closing line.
 `;
 }
