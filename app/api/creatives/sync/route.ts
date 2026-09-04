@@ -38,14 +38,33 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: pending } = await supabase
+  const { data: primaries } = await supabase
     .from("creatives")
     .select("id, image_url")
     .eq("client_id", client.id)
     .eq("archived", false)
     .is("meta_image_hash", null);
 
-  if (!pending?.length) {
+  // Renditions are images in their own right and need their own hash. The push
+  // will upload one it finds missing, but doing it there puts a Graph round
+  // trip per size inside the launch, which is the worst moment for it.
+  const { data: assets } = await supabase
+    .from("creative_assets")
+    .select("id, image_url, creatives!inner(client_id, archived)")
+    .eq("creatives.client_id", client.id)
+    .eq("creatives.archived", false)
+    .is("meta_image_hash", null);
+
+  const pending = [
+    ...(primaries ?? []).map((row) => ({ ...row, table: "creatives" as const })),
+    ...(assets ?? []).map((row) => ({
+      id: row.id as string,
+      image_url: row.image_url as string,
+      table: "creative_assets" as const,
+    })),
+  ];
+
+  if (!pending.length) {
     return NextResponse.json({ synced: 0, failed: 0, results: [] });
   }
 
@@ -59,7 +78,7 @@ export async function POST(request: Request) {
         try {
           const hash = await uploadAdImage(client.meta_ad_account_id!, creative.image_url, client.meta_business);
           await supabase
-            .from("creatives")
+            .from(creative.table)
             .update({ meta_image_hash: hash })
             .eq("id", creative.id);
           return { id: creative.id, ok: true };

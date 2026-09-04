@@ -34,7 +34,13 @@ interface Creative {
   width: number | null;
   height: number | null;
   /** Extra aspect-ratio renditions, each delivered to its own placements. */
-  creative_assets: Array<{ id: string; ratio: Ratio; image_url: string; derived: boolean }>;
+  creative_assets: Array<{
+    id: string;
+    ratio: Ratio;
+    image_url: string;
+    derived: boolean;
+    meta_image_hash: string | null;
+  }>;
 }
 
 export function CreativesView({ clients }: { clients: ClientOption[] }) {
@@ -61,7 +67,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     const { data } = await supabase
       .from("creatives")
       .select(
-        "id, image_url, label, meta_image_hash, archived, source, has_baked_text, width, height, creative_assets(id, ratio, image_url, derived)",
+        "id, image_url, label, meta_image_hash, archived, source, has_baked_text, width, height, creative_assets(id, ratio, image_url, derived, meta_image_hash)",
       )
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
@@ -75,7 +81,13 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
 
   const visible = creatives.filter((c) => (showArchived ? c.archived : !c.archived));
   const archivedCount = creatives.filter((c) => c.archived).length;
-  const unsynced = creatives.filter((c) => !c.archived && !c.meta_image_hash);
+  // Every image that still needs a hash, renditions included: a creative whose
+  // vertical has never been uploaded is not "on Meta" in any useful sense.
+  const unsynced = creatives.filter(
+    (c) =>
+      !c.archived &&
+      (!c.meta_image_hash || c.creative_assets.some((a) => !a.meta_image_hash)),
+  );
 
   // Active creatives with nothing to serve a story or reel with. They still
   // launch — Meta fits the square into the frame — but a fitted square is a
@@ -569,10 +581,14 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
                         className="h-full w-full object-cover"
                       />
                       <span className="absolute top-2 left-2 flex flex-col items-start gap-1">
-                        {creative.meta_image_hash ? (
-                          <Badge tone="success" glyph="●">On Meta</Badge>
-                        ) : (
+                        {!creative.meta_image_hash ? (
                           <Badge tone="warning" glyph="▲">Not uploaded</Badge>
+                        ) : creative.creative_assets.some((a) => !a.meta_image_hash) ? (
+                          <span title="The main image is on Meta but another size is not. It uploads on push, or sync now to get it out of the way.">
+                            <Badge tone="warning" glyph="▲">Sizes pending</Badge>
+                          </span>
+                        ) : (
+                          <Badge tone="success" glyph="●">On Meta</Badge>
                         )}
                         {/* Says why this image will run un-cropped: Meta's
                             placement reframing would cut the copy off it. */}
