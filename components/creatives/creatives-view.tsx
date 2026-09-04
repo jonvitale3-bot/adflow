@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
-import { ACCEPTED_TYPES, prepareImage, storagePath } from "@/lib/creatives/image";
+import { groupByStem, groupKey } from "@/lib/creatives/filenames";
+import { ACCEPTED_TYPES, prepareImage, storagePath, type PreparedImage } from "@/lib/creatives/image";
 import { ratioOf, RATIO_HINTS, RATIO_LABELS, RATIOS, type Ratio } from "@/lib/creatives/ratios";
 import { createClient } from "@/lib/supabase/client";
 import { GenerateDialog } from "@/components/creatives/generate-dialog";
@@ -95,37 +96,134 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     const supabase = createClient();
     const failures: string[] = [];
 
-    for (const [i, file] of list.entries()) {
+    // Files named for the same ad are the same ad. A designer exporting one
+    // creative in three ratios names them "storage-1x1", "storage-9x16",
+    // "storage-1200x628", so dropping the set in makes one creative with three
+    // renditions rather than three creatives that happen to look alike.
+    const groups = groupByStem(list, (f) => f.name);
+    let done = 0;
+    let sets = 0;
+
+    for (const group of groups) {
       try {
-        // WebP is converted to JPEG here — Meta rejects WebP outright.
-        const prepared = await prepareImage(file);
-        const path = storagePath(clientId, prepared.extension);
+        // Prepared first: the file's dimensions decide its ratio, not its
+        // name. A renamed export is exactly how a story gets called a square.
+        const prepared = await Promise.all(
+          group.files.map(async (file) => {
+            // WebP is converted to JPEG here, Meta rejects WebP outright.
+            const image = await prepareImage(file);
+            return { file, image, ratio: ratioOf(image.width, image.height) };
+          }),
+        );
 
-        const { error: uploadError } = await supabase.storage
+        // The square is the primary: it is what every existing creative is,
+        // and it is the shape Meta falls back to for any placement without a
+        // rule of its own.
+        const primary = prepared.find((p) => p.ratio === "square") ?? prepared[0]!;
+        const rest = prepared.filter((p) => p !== primary);
+
+        async function store(image: PreparedImage) {
+          const path = storagePath(clientId, image.extension);
+          const { error } = await supabase.storage
+            .from("creatives")
+            .upload(path, image.blob, { contentType: image.contentType });
+          if (error) throw new Error(error.message);
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("creatives").getPublicUrl(path);
+          return { path, publicUrl };
+        }
+
+        // A set can arrive in instalments: the square today, the vertical
+        // once the designer sends it. When something already carries this
+        // name, the new files join it instead of becoming a second creative.
+        const existing = creatives.find(
+          (c) => !c.archived && c.label && groupKey(c.label) === group.key,
+        );
+
+        if (existing) {
+          for (const item of prepared) {
+            const itemStored = await store(item.image);
+            const { error: assetError } = await supabase.from("creative_assets").upsert(
+              {
+                creative_id: existing.id,
+                ratio: item.ratio,
+                storage_path: itemStored.path,
+                image_url: itemStored.publicUrl,
+                width: item.image.width,
+                height: item.image.height,
+                derived: false,
+                // A replaced file is a different image, so the old hash is void.
+                meta_image_hash: null,
+              },
+              { onConflict: "creative_id,ratio" },
+            );
+            if (assetError) throw new Error(assetError.message);
+            done += 1;
+            setUploading({ done, total: list.length });
+          }
+          sets += 1;
+          continue;
+        }
+
+        const stored = await store(primary.image);
+
+        // The label is what a spreadsheet's Image column matches on and what a
+        // later upload of another size groups against, so a blank one falls
+        // back to the filename rather than staying empty.
+        const { data: created, error: insertError } = await supabase
           .from("creatives")
-          .upload(path, prepared.blob, { contentType: prepared.contentType });
-        if (uploadError) throw new Error(uploadError.message);
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("creatives").getPublicUrl(path);
-
-        const { error: insertError } = await supabase.from("creatives").insert({
-          client_id: clientId,
-          storage_path: path,
-          image_url: publicUrl,
-          label: label.trim() || null,
-          source: "upload",
-          // Its own shape, so the push knows which placements it already
-          // covers and which still need a rendition.
-          width: prepared.width,
-          height: prepared.height,
-        });
+          .insert({
+            client_id: clientId,
+            storage_path: stored.path,
+            image_url: stored.publicUrl,
+            label: label.trim() || group.stem,
+            source: "upload",
+            width: primary.image.width,
+            height: primary.image.height,
+          })
+          .select("id")
+          .single();
         if (insertError) throw new Error(insertError.message);
+        done += 1;
+        setUploading({ done, total: list.length });
+
+        for (const extra of rest) {
+          // The primary already covers its own shape; a second file of the
+          // same ratio would give the push two images for one placement.
+          if (extra.ratio === primary.ratio) {
+            failures.push(
+              `${extra.file.name} is the same shape as ${primary.file.name}, so it was skipped.`,
+            );
+            done += 1;
+            setUploading({ done, total: list.length });
+            continue;
+          }
+
+          const extraStored = await store(extra.image);
+          const { error: assetError } = await supabase.from("creative_assets").upsert(
+            {
+              creative_id: created.id,
+              ratio: extra.ratio,
+              storage_path: extraStored.path,
+              image_url: extraStored.publicUrl,
+              width: extra.image.width,
+              height: extra.image.height,
+              derived: false,
+            },
+            { onConflict: "creative_id,ratio" },
+          );
+          if (assetError) throw new Error(assetError.message);
+          done += 1;
+          setUploading({ done, total: list.length });
+        }
+
+        if (prepared.length > 1) sets += 1;
       } catch (err) {
-        failures.push(err instanceof Error ? err.message : `${file.name} failed`);
+        failures.push(err instanceof Error ? err.message : `${group.stem} failed`);
+        done += group.files.length;
+        setUploading({ done, total: list.length });
       }
-      setUploading({ done: i + 1, total: list.length });
     }
 
     setUploading(null);
@@ -133,7 +231,13 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     if (failures.length) {
       setMessage({ tone: "error", text: failures.join(" · ") });
     } else {
-      setMessage({ tone: "ok", text: `Uploaded ${list.length} image${list.length === 1 ? "" : "s"}.` });
+      setMessage({
+        tone: "ok",
+        text:
+          sets > 0
+            ? `Uploaded ${list.length} images as ${groups.length} creative${groups.length === 1 ? "" : "s"}, ${sets} of them with more than one size.`
+            : `Uploaded ${list.length} image${list.length === 1 ? "" : "s"}.`,
+      });
     }
     void load();
 
@@ -417,6 +521,12 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
                     JPEG, PNG or WebP up to 20 MB. WebP is converted to JPEG automatically,
                     because Meta rejects it.
                   </p>
+                  <p className="mt-1 text-[12px] text-text-tertiary">
+                    Files named alike are one creative in several sizes:{" "}
+                    <span className="font-mono">storage-1x1.jpg</span> and{" "}
+                    <span className="font-mono">storage-9x16.jpg</span> upload together, and a
+                    size sent later joins the creative already named for it.
+                  </p>
                 </>
               )}
             </div>
@@ -424,7 +534,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="Optional label applied to this batch"
+              placeholder="Optional label. Leave blank to name each creative after its file."
               className="mt-3 h-8 w-full rounded-md border border-border-strong bg-surface px-2.5 text-[13px] outline-none placeholder:text-text-tertiary focus:border-accent focus:focus-ring"
             />
 
