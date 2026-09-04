@@ -390,12 +390,14 @@ export async function generatePreview(
   adAccountId: string,
   creativeSpec: Record<string, unknown>,
   format: AdFormat = "MOBILE_FEED_STANDARD",
+  business?: string | null,
 ): Promise<string | null> {
   const body = await request<Paged<{ body?: string }>>(
     url(`${adAccountId}/generatepreviews`, {
       creative: JSON.stringify(creativeSpec),
       ad_format: format,
     }),
+    { business },
   );
 
   return body.data?.[0]?.body ?? null;

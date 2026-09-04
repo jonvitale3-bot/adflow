@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { PreviewDialog } from "@/components/launch/preview-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -46,6 +47,7 @@ export function ReviewGrid({
   onPair?: () => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [previewing, setPreviewing] = useState<string | null>(null);
 
   const drafts = variations.filter((v) => v.status === "draft");
   const pushed = variations.filter((v) => v.status === "pushed");
@@ -184,11 +186,24 @@ export function ReviewGrid({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-[13px] font-semibold">{v.headline}</h3>
-                      {v.angle && (
-                        <span className="shrink-0 rounded-sm bg-surface-muted px-1.5 py-0.5 text-[10px] text-text-secondary">
-                          {v.angle}
-                        </span>
-                      )}
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {v.angle && (
+                          <span className="rounded-sm bg-surface-muted px-1.5 py-0.5 text-[10px] text-text-secondary">
+                            {v.angle}
+                          </span>
+                        )}
+                        {/* Stops the click short of the card, so looking at an
+                            ad never changes what is selected for launch. */}
+                        <Button
+                          size="row"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewing(v.id);
+                          }}
+                        >
+                          Preview
+                        </Button>
+                      </div>
                     </div>
                     <p className="mt-1.5 text-[12px] leading-[1.5] whitespace-pre-line text-text-secondary">
                       {v.primary_text}
@@ -212,6 +227,14 @@ export function ReviewGrid({
           );
         })}
       </ul>
+
+      {previewing && (
+        <PreviewDialog
+          variations={shown}
+          startId={previewing}
+          onClose={() => setPreviewing(null)}
+        />
+      )}
     </div>
   );
 }
