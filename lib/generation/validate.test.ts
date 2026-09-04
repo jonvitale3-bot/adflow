@@ -161,3 +161,26 @@ test("a marina citing its Google rating is not a boat club membership claim", ()
   const w = validateBoatClubVariation(v({ primary_text: "4.7 from 157 Google reviews." }));
   assert.deepEqual(rules(w), []);
 });
+
+test("a rating written as a symbol counts the same as the word", () => {
+  // "4.7 stars from 157 boaters" and "4.7\u2605 from 157 boaters" are one
+  // sentence in two typographies; only one of them used to pass.
+  for (const text of [
+    "Bay Pines Marina, St. Pete. 4.7\u2605 from 157 boaters. See what's open.",
+    "4.7 stars from 157 boaters.",
+    "Rated 4.7 out of 5 by 157 boaters.",
+    "4.7/5 from 157 boaters.",
+  ]) {
+    assert.ok(
+      !rules(validateVariation(v({ primary_text: text }))).includes("invented_social_proof"),
+      `wrongly flagged: ${text}`,
+    );
+  }
+});
+
+test("a symbol elsewhere in the ad does not excuse an invented count", () => {
+  // The exemption is per sentence, so a rating in one line cannot launder a
+  // membership claim in another.
+  const text = "4.7\u2605 from 157 Google reviews.\n\nHundreds of members near you.";
+  assert.ok(rules(validateVariation(v({ primary_text: text }))).includes("invented_social_proof"));
+});

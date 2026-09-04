@@ -71,13 +71,24 @@ const CHOOSING_CLAIM = new RegExp(String.raw`\b${QUANTITY}\s+(?:\w+\s+){0,2}${CH
  * runs a sentence at a time, and a sentence that names its source keeps its
  * number.
  */
-const SOURCED = /\b(google|yelp|facebook|trustpilot|bbb|angi|tripadvisor|reviews?|rated|rating|stars?)\b/i;
+const SOURCED =
+  // A named platform, or the language of a review.
+  /\b(google|yelp|facebook|trustpilot|bbb|angi|tripadvisor|reviews?|reviewers?|rated|ratings?|stars?)\b/i;
+
+/**
+ * A rating written as a symbol rather than a word.
+ *
+ * "4.7 stars from 157 boaters" and "4.7\u2605 from 157 boaters" are the same
+ * sentence, and the second is the form that ends up on the creative. Reading
+ * only the word made the rule depend on typography.
+ */
+const RATING_MARK = /\d(?:\.\d)?\s*(?:[\u2605\u2606\u2b50\u272a\u272d]|\/\s*5\b|out of 5\b)/i;
 
 function claimsUnverifiableProof(text: string): boolean {
   return text
     .split(/(?<=[.!?\n])\s+/)
     .some((sentence) => {
-      if (SOURCED.test(sentence)) return false;
+      if (SOURCED.test(sentence) || RATING_MARK.test(sentence)) return false;
       return PEOPLE_CLAIM.test(sentence) || CHOOSING_CLAIM.test(sentence);
     });
 }
