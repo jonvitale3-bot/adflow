@@ -15,6 +15,8 @@ export interface Variation {
   status: string;
   meta_ad_id: string | null;
   error: string | null;
+  /** Set when the ad launched with less than it asked for. */
+  push_note: string | null;
   creatives: { image_url: string } | null;
 }
 
@@ -218,6 +220,13 @@ export function ReviewGrid({
                     ) : (
                       <p className="font-mono text-[11px] text-text-tertiary">
                         Ad {v.meta_ad_id} · paused
+                      </p>
+                    )}
+                    {/* A push that succeeded with less than it asked for says
+                        so, or the next batch is built on a stale assumption. */}
+                    {v.push_note && (
+                      <p className="mt-1 text-[11px] leading-[1.45] text-warning-on-subtle">
+                        ▲ {v.push_note}
                       </p>
                     )}
                   </div>

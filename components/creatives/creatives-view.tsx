@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
-import { prepareImage, storagePath } from "@/lib/creatives/image";
+import { ACCEPTED_TYPES, prepareImage, storagePath } from "@/lib/creatives/image";
+import { ratioOf, RATIO_HINTS, RATIO_LABELS, RATIOS, type Ratio } from "@/lib/creatives/ratios";
 import { createClient } from "@/lib/supabase/client";
 import { GenerateDialog } from "@/components/creatives/generate-dialog";
 import { sceneOptions } from "@/lib/generation/images/labels";
@@ -29,6 +30,10 @@ interface Creative {
   source: string;
   /** NULL until examined. Non-false blocks Meta placement cropping. */
   has_baked_text: boolean | null;
+  width: number | null;
+  height: number | null;
+  /** Extra aspect-ratio renditions, each delivered to its own placements. */
+  creative_assets: Array<{ id: string; ratio: Ratio; image_url: string }>;
 }
 
 export function CreativesView({ clients }: { clients: ClientOption[] }) {
@@ -38,6 +43,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
   const [showArchived, setShowArchived] = useState(false);
   const [label, setLabel] = useState("");
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
+  const [addingTo, setAddingTo] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -52,7 +58,9 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     const supabase = createClient();
     const { data } = await supabase
       .from("creatives")
-      .select("id, image_url, label, meta_image_hash, archived, source, has_baked_text")
+      .select(
+        "id, image_url, label, meta_image_hash, archived, source, has_baked_text, width, height, creative_assets(id, ratio, image_url)",
+      )
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
     setCreatives((data ?? []) as Creative[]);
@@ -97,6 +105,10 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
           image_url: publicUrl,
           label: label.trim() || null,
           source: "upload",
+          // Its own shape, so the push knows which placements it already
+          // covers and which still need a rendition.
+          width: prepared.width,
+          height: prepared.height,
         });
         if (insertError) throw new Error(insertError.message);
       } catch (err) {
@@ -128,6 +140,66 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
         // The launch flow runs the same pass before generating copy, so a
         // failure here costs nothing but a later wait.
       });
+  }
+
+  /**
+   * Adds another aspect ratio to an existing creative.
+   *
+   * The file says what shape it is, so nothing is asked — a mislabelled asset
+   * is worse than a missing one, because it sends a letterboxed square into
+   * the slot a full-screen story was supposed to fill.
+   */
+  async function addAsset(creativeId: string, file: File) {
+    if (!clientId) return;
+    setAddingTo(creativeId);
+    setMessage(null);
+    try {
+      const prepared = await prepareImage(file);
+      const path = storagePath(clientId, prepared.extension);
+
+      const supabase = createClient();
+      const { error: uploadError } = await supabase.storage
+        .from("creatives")
+        .upload(path, prepared.blob, { contentType: prepared.contentType });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("creatives").getPublicUrl(path);
+
+      const ratio = ratioOf(prepared.width, prepared.height);
+      // Replacing a ratio rather than adding a second one: the push must never
+      // have to choose between two images for the same placement. The stored
+      // Meta hash goes with it, so the new file is uploaded on next push.
+      const { error: insertError } = await supabase
+        .from("creative_assets")
+        .upsert(
+          {
+            creative_id: creativeId,
+            ratio,
+            storage_path: path,
+            image_url: publicUrl,
+            width: prepared.width,
+            height: prepared.height,
+            meta_image_hash: null,
+          },
+          { onConflict: "creative_id,ratio" },
+        );
+      if (insertError) throw new Error(insertError.message);
+
+      setMessage({
+        tone: "ok",
+        text: `Added a ${RATIO_LABELS[ratio].toLowerCase()} version (${prepared.width}×${prepared.height}).`,
+      });
+      void load();
+    } catch (err) {
+      setMessage({
+        tone: "error",
+        text: err instanceof Error ? err.message : "Could not add that size",
+      });
+    } finally {
+      setAddingTo(null);
+    }
   }
 
   async function setArchived(id: string, archived: boolean) {
@@ -347,6 +419,12 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
                       </span>
                     </div>
 
+                    <RatioRow
+                      creative={creative}
+                      busy={addingTo === creative.id}
+                      onAdd={(file) => void addAsset(creative.id, file)}
+                    />
+
                     <div className="mt-1.5 flex items-center gap-1">
                       <span className="min-w-0 flex-1 truncate text-[12px] text-text-secondary">
                         {creative.label ?? (creative.source === "ai" ? "Generated" : "Uploaded")}
@@ -393,5 +471,71 @@ function Header() {
     <header className="flex h-[52px] shrink-0 items-center border-b border-border bg-surface px-8">
       <h1 className="text-[20px] font-semibold tracking-[-0.01em]">Creatives</h1>
     </header>
+  );
+}
+
+/**
+ * Which placements this creative can already be delivered to, and a way to
+ * fill a gap.
+ *
+ * An ad with only a square still launches — it is fitted into a story rather
+ * than cropped into one, so nothing is lost but the full frame. This row is
+ * how that becomes visible before launch instead of after.
+ */
+function RatioRow({
+  creative,
+  busy,
+  onAdd,
+}: {
+  creative: Creative;
+  busy: boolean;
+  onAdd: (file: File) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+
+  // The primary image covers its own shape; older rows predate the dimension
+  // columns and are square, which every creative in the library then was.
+  const primary =
+    creative.width && creative.height ? ratioOf(creative.width, creative.height) : "square";
+  const have = new Set<Ratio>([primary, ...creative.creative_assets.map((a) => a.ratio)]);
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+      {RATIOS.map((ratio) => (
+        <span
+          key={ratio}
+          title={RATIO_HINTS[ratio]}
+          className={cn(
+            "rounded-sm px-1.5 py-0.5 text-[10px] font-[550]",
+            have.has(ratio)
+              ? "bg-success-subtle text-success-on-subtle"
+              : "bg-surface-muted text-text-tertiary",
+          )}
+        >
+          {have.has(ratio) ? "●" : "○"} {RATIO_LABELS[ratio]}
+        </span>
+      ))}
+
+      <input
+        ref={input}
+        type="file"
+        accept={ACCEPTED_TYPES.join(",")}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onAdd(file);
+          e.target.value = "";
+        }}
+      />
+      <Button
+        size="row"
+        variant="ghost"
+        disabled={busy}
+        onClick={() => input.current?.click()}
+        title="Upload another size of this same creative. Its dimensions decide which placements it serves."
+      >
+        {busy ? "Adding…" : "+ Size"}
+      </Button>
+    </div>
   );
 }

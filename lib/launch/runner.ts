@@ -3,6 +3,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { mayReframe } from "@/lib/creatives/placement";
+import { ratioOf, type Ratio } from "@/lib/creatives/ratios";
+import { buildAssetFeedSpec, type RatioAsset } from "@/lib/meta/asset-feed";
 import {
   createAd,
   createAdCreative,
@@ -75,7 +77,7 @@ async function pushOne(
   const { data: variation } = await db
     .from("ad_variations")
     .select(
-      "id, headline, primary_text, meta_ad_id, creative_id, creatives(id, image_url, meta_image_hash, has_baked_text)",
+      "id, headline, primary_text, meta_ad_id, creative_id, creatives(id, image_url, meta_image_hash, has_baked_text, width, height)",
     )
     .eq("id", variationId)
     .single();
@@ -126,41 +128,64 @@ async function pushOne(
     throw new Error("Client has no landing page URL");
   }
 
-  let metaCreativeId: string;
-  try {
-    metaCreativeId = await createAdCreative({
-      adAccountId: client.meta_ad_account_id,
-      pageId: client.meta_page_id,
-      instagramAccountId: client.instagram_account_id ?? undefined,
-      name: `${client.name} — ${variation.headline}`,
-      message: variation.primary_text,
-      headline: variation.headline,
-      link,
-      imageHash,
-      urlTags,
-      adaptToPlacement,
-      business: client.meta_business,
-    });
-  } catch (err) {
-    // Supplying an Instagram actor fails when the Page has no linked IG
-    // business account, and the error is opaque. Retry once without it.
-    if (client.instagram_account_id && err instanceof MetaApiError) {
-      metaCreativeId = await createAdCreative({
-        adAccountId: client.meta_ad_account_id,
-        pageId: client.meta_page_id,
-        name: `${client.name} — ${variation.headline}`,
-        message: variation.primary_text,
-        headline: variation.headline,
-        link,
-        imageHash,
-        urlTags,
-        adaptToPlacement,
-        business: client.meta_business,
-      });
-    } else {
-      throw err;
+  // Per-placement assets, when this creative has any. The square already has a
+  // hash from above; the rest are uploaded once and remembered.
+  const assetFeedSpec = buildAssetFeedSpec({
+    assets: await syncRatioAssets(db, client, creative, imageHash),
+    message: variation.primary_text,
+    headline: variation.headline,
+    link,
+  });
+
+  const base = {
+    adAccountId: client.meta_ad_account_id,
+    pageId: client.meta_page_id,
+    name: `${client.name} — ${variation.headline}`,
+    message: variation.primary_text,
+    headline: variation.headline,
+    link,
+    imageHash,
+    urlTags,
+    adaptToPlacement,
+    business: client.meta_business,
+  };
+
+  // Tried in order, best first. Two things can be rejected independently:
+  // an Instagram actor the Page has no linked account for, and a
+  // per-placement spec the account will not take. Neither is worth failing a
+  // launch over when a plainer creative would have gone through, so the ad
+  // lands and the review grid says what was given up.
+  const igVariants = client.instagram_account_id
+    ? [client.instagram_account_id, undefined]
+    : [undefined];
+  const specVariants = assetFeedSpec ? [assetFeedSpec, null] : [null];
+
+  let metaCreativeId: string | null = null;
+  let pushNote: string | null = null;
+  let lastError: unknown = null;
+
+  outer: for (const spec of specVariants) {
+    for (const instagramAccountId of igVariants) {
+      try {
+        metaCreativeId = await createAdCreative({
+          ...base,
+          instagramAccountId,
+          assetFeedSpec: spec,
+        });
+        if (assetFeedSpec && !spec) {
+          pushNote = `Launched with one image for every placement. Meta rejected the per-placement version: ${
+            lastError instanceof Error ? lastError.message : "unknown error"
+          }`;
+        }
+        break outer;
+      } catch (err) {
+        if (!(err instanceof MetaApiError)) throw err;
+        lastError = err;
+      }
     }
   }
+
+  if (!metaCreativeId) throw lastError ?? new Error("Could not create the ad creative");
 
   const adId = await createAd({
     adAccountId: client.meta_ad_account_id,
@@ -177,6 +202,7 @@ async function pushOne(
       meta_ad_id: adId,
       meta_creative_id: metaCreativeId,
       meta_adset_id: adSetId,
+      push_note: pushNote,
       status: "pushed",
       error: null,
     })
@@ -187,6 +213,66 @@ async function pushOne(
  * Assigns a creative to a variation that has none, spreading choices across the
  * library rather than putting the same image on every late-paired ad.
  */
+/**
+ * The renditions this ad can be delivered with, each carrying a Meta hash.
+ *
+ * The primary image is always included as the square — it is what every
+ * existing creative is, and it is the shape Meta falls back to. Additional
+ * renditions are uploaded on first use and remembered, so a second push of the
+ * same creative costs nothing.
+ *
+ * An upload that fails is dropped rather than fatal: losing the vertical costs
+ * a well-framed story, while failing the push costs the whole ad.
+ */
+async function syncRatioAssets(
+  db: Db,
+  client: ClientContext,
+  creative: PairedCreative,
+  primaryHash: string,
+): Promise<RatioAsset[]> {
+  const { data: rows } = await db
+    .from("creative_assets")
+    .select("id, ratio, image_url, meta_image_hash")
+    .eq("creative_id", creative.id);
+
+  const assets: RatioAsset[] = [
+    { ratio: ratioOfCreative(creative), imageHash: primaryHash },
+  ];
+  if (!rows?.length) return assets;
+
+  for (const row of rows) {
+    const ratio = row.ratio as Ratio;
+    // The primary already covers its own ratio.
+    if (assets.some((a) => a.ratio === ratio)) continue;
+
+    try {
+      let hash = row.meta_image_hash as string | null;
+      if (!hash) {
+        hash = await uploadAdImage(
+          client.meta_ad_account_id!,
+          row.image_url as string,
+          client.meta_business,
+        );
+        await db.from("creative_assets").update({ meta_image_hash: hash }).eq("id", row.id);
+      }
+      assets.push({ ratio, imageHash: hash });
+    } catch {
+      // Deliver what did upload.
+    }
+  }
+
+  return assets;
+}
+
+/**
+ * The primary image's own shape. NULL dimensions predate the column and are
+ * square — every creative in the library at that point was.
+ */
+function ratioOfCreative(creative: PairedCreative): Ratio {
+  if (!creative.width || !creative.height) return "square";
+  return ratioOf(creative.width, creative.height);
+}
+
 /** What the push needs to know about the image an ad will run with. */
 interface PairedCreative {
   id: string;
@@ -194,6 +280,8 @@ interface PairedCreative {
   meta_image_hash: string | null;
   /** NULL until the vision pass has looked; treated as true. */
   has_baked_text: boolean | null;
+  width: number | null;
+  height: number | null;
 }
 
 async function pairLate(
@@ -203,7 +291,7 @@ async function pairLate(
 ): Promise<PairedCreative | null> {
   const { data: creatives } = await db
     .from("creatives")
-    .select("id, image_url, meta_image_hash, has_baked_text, created_at")
+    .select("id, image_url, meta_image_hash, has_baked_text, width, height, created_at")
     .eq("client_id", clientId)
     .eq("archived", false)
     .order("created_at", { ascending: true })
@@ -236,6 +324,8 @@ async function pairLate(
     image_url: chosen.image_url,
     meta_image_hash: chosen.meta_image_hash,
     has_baked_text: chosen.has_baked_text,
+    width: chosen.width,
+    height: chosen.height,
   };
 }
 

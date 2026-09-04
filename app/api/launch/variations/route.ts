@@ -59,7 +59,9 @@ export async function POST(request: Request) {
         status: "draft" as const,
       })),
     )
-    .select("id, headline, primary_text, angle, status, meta_ad_id, error, creatives(image_url)");
+    .select(
+      "id, headline, primary_text, angle, status, meta_ad_id, error, push_note, creatives(image_url)",
+    );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 

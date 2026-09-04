@@ -290,19 +290,29 @@ export interface CreateCreativeInput {
    * corner an offer badge sits in, and the ad runs with half a price on it.
    */
   adaptToPlacement: boolean;
+  /**
+   * Per-placement assets. When present, the creative is built from an
+   * asset_feed_spec instead of link_data: each image is delivered to the
+   * placements it was designed for, and Meta reframes nothing.
+   */
+  assetFeedSpec?: Record<string, unknown> | null;
 }
 
 export async function createAdCreative(input: CreateCreativeInput): Promise<string> {
-  const spec: Record<string, unknown> = {
-    page_id: input.pageId,
-    link_data: {
-      message: input.message,
-      name: input.headline,
-      link: input.link,
-      image_hash: input.imageHash,
-      call_to_action: { type: "LEARN_MORE" },
-    },
-  };
+  // With per-placement assets the images, copy and link all live in the asset
+  // feed, so the story spec carries only the identities the ad runs as.
+  const spec: Record<string, unknown> = input.assetFeedSpec
+    ? { page_id: input.pageId }
+    : {
+        page_id: input.pageId,
+        link_data: {
+          message: input.message,
+          name: input.headline,
+          link: input.link,
+          image_hash: input.imageHash,
+          call_to_action: { type: "LEARN_MORE" },
+        },
+      };
 
   if (input.instagramAccountId) {
     spec.instagram_actor_id = input.instagramAccountId;
@@ -312,7 +322,10 @@ export async function createAdCreative(input: CreateCreativeInput): Promise<stri
   // placement, the other animates it. Neither is safe over designed-in copy,
   // so an image carrying its own headline opts out of both and is delivered
   // as authored — fitted to the placement rather than cropped into it.
-  const enroll = input.adaptToPlacement ? "OPT_IN" : "OPT_OUT";
+  //
+  // Per-placement assets opt out too, always: the whole point of supplying a
+  // designed vertical is that nothing has to be derived from the square.
+  const enroll = input.adaptToPlacement && !input.assetFeedSpec ? "OPT_IN" : "OPT_OUT";
 
   const form = new URLSearchParams({
     name: input.name,
@@ -325,6 +338,10 @@ export async function createAdCreative(input: CreateCreativeInput): Promise<stri
       },
     }),
   });
+
+  if (input.assetFeedSpec) {
+    form.set("asset_feed_spec", JSON.stringify(input.assetFeedSpec));
+  }
 
   const body = await request<{ id: string }>(url(`${input.adAccountId}/adcreatives`), {
     method: "POST",

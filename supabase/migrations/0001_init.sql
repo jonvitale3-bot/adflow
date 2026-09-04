@@ -531,3 +531,79 @@ comment on column public.creatives.has_baked_text is
 -- Generated images are photographs by construction: the image prompt forbids
 -- text, logos, buttons and colour bars outright, so they are safe to reframe.
 update public.creatives set has_baked_text = false where source = 'ai';
+
+-- ---------------------------------------------------------------------------
+-- Per-placement creative.
+--
+-- One image cannot serve a square feed post and a full-screen story. In Ads
+-- Manager you handle this by uploading a separate asset per aspect ratio; on
+-- the API the same thing is an `asset_feed_spec` whose images each carry an ad
+-- label, plus `asset_customization_rules` mapping each label to the placements
+-- it should serve.
+--
+-- A creative row stays the concept and keeps its primary image, so every
+-- existing path — pairing, description, the single-image push — is unchanged.
+-- This table holds the ADDITIONAL renditions of that same concept. An ad with
+-- no rows here pushes exactly as it always has.
+-- ---------------------------------------------------------------------------
+
+create type creative_ratio as enum ('square', 'vertical', 'horizontal');
+
+create table public.creative_assets (
+  id              uuid primary key default gen_random_uuid(),
+  creative_id     uuid not null references public.creatives(id) on delete cascade,
+
+  ratio           creative_ratio not null,
+  storage_path    text not null,
+  image_url       text not null,
+  width           integer,
+  height          integer,
+
+  -- How this rendition came to exist: uploaded by hand, or derived from the
+  -- primary image. Derived assets can be regenerated; uploaded ones cannot.
+  derived         boolean not null default false,
+
+  -- Meta image library hash, persisted so a repeated push does not re-upload.
+  meta_image_hash text,
+
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+-- One rendition per ratio per creative: a second upload for a ratio replaces
+-- the first rather than making the push pick arbitrarily between them.
+create unique index creative_assets_ratio_idx
+  on public.creative_assets (creative_id, ratio);
+
+create trigger creative_assets_updated_at before update on public.creative_assets
+  for each row execute function set_updated_at();
+
+comment on table public.creative_assets is
+  'Additional aspect-ratio renditions of a creative. Presence of any row switches that ad''s push to a per-placement asset_feed_spec; absence keeps the single-image path.';
+
+-- Dimensions of the primary image, so its own ratio is known without
+-- re-reading the file. NULL on rows uploaded before this existed; those are
+-- treated as square, which every creative in the library currently is.
+alter table public.creatives
+  add column width  integer,
+  add column height integer;
+
+-- Same posture as every other table: the app has exactly one trusted operator,
+-- and anon reaches nothing.
+alter table public.creative_assets enable row level security;
+revoke all on public.creative_assets from anon;
+grant select, insert, update, delete on public.creative_assets to authenticated;
+create policy creative_assets_authenticated_all on public.creative_assets
+  for all to authenticated using (true) with check (true);
+
+-- What an ad gave up to get pushed.
+--
+-- Per-placement creative and an Instagram actor are each attempted and each
+-- can be rejected on its own. Falling back is right — a plainer ad in the
+-- account beats a failed launch — but silently is not, or the next batch is
+-- built on an assumption that stopped being true.
+alter table public.ad_variations
+  add column push_note text;
+
+comment on column public.ad_variations.push_note is
+  'Set when the push succeeded with less than it asked for, e.g. Meta rejected the per-placement asset spec and the ad launched with one image everywhere.';

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { mayReframe } from "@/lib/creatives/placement";
+import { ratioForPreview } from "@/lib/creatives/ratios";
 import { generatePreview, MetaApiError, type AdFormat } from "@/lib/meta/client";
 import { parsePreviewFrame } from "@/lib/meta/preview";
 import { appendUrlTags, buildUrlTags } from "@/lib/meta/utm";
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   const { data: variation } = await supabase
     .from("ad_variations")
     .select(
-      "id, headline, primary_text, client_id, creatives(image_url, meta_image_hash, has_baked_text)",
+      "id, headline, primary_text, client_id, creatives(id, image_url, meta_image_hash, has_baked_text)",
     )
     .eq("id", parsed.data.variationId)
     .single();
@@ -66,8 +67,32 @@ export async function POST(request: Request) {
   }
 
   const creative = variation.creatives as unknown as
-    | { image_url: string; meta_image_hash: string | null; has_baked_text: boolean | null }
+    | {
+        id: string;
+        image_url: string;
+        meta_image_hash: string | null;
+        has_baked_text: boolean | null;
+      }
     | null;
+
+  // Show the rendition that will actually serve this placement. Previewing a
+  // story with the square would answer the wrong question — that image is not
+  // what runs there once a vertical exists.
+  let image = creative
+    ? { hash: creative.meta_image_hash, url: creative.image_url as string | null }
+    : null;
+
+  if (creative) {
+    const wanted = ratioForPreview(parsed.data.format);
+    const { data: asset } = await supabase
+      .from("creative_assets")
+      .select("image_url, meta_image_hash")
+      .eq("creative_id", creative.id)
+      .eq("ratio", wanted)
+      .maybeSingle();
+
+    if (asset) image = { hash: asset.meta_image_hash, url: asset.image_url };
+  }
 
   const urlTags = buildUrlTags(client.name, variation.headline);
   const link = appendUrlTags(client.landing_page_url ?? "https://example.com", urlTags);
@@ -80,8 +105,8 @@ export async function POST(request: Request) {
     link,
     call_to_action: { type: "LEARN_MORE" },
   };
-  if (creative?.meta_image_hash) linkData.image_hash = creative.meta_image_hash;
-  else if (creative?.image_url) linkData.picture = creative.image_url;
+  if (image?.hash) linkData.image_hash = image.hash;
+  else if (image?.url) linkData.picture = image.url;
 
   const storySpec: Record<string, unknown> = {
     page_id: client.meta_page_id,
