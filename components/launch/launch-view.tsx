@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -114,6 +114,40 @@ export function LaunchView({
       .eq("archived", false)
       .then(({ count: n }) => setCreativeCount(n ?? 0));
   }, [clientId, stage]);
+
+  // Remember the destination as it is chosen.
+  //
+  // It used to be written only after a successful push, so a client picked,
+  // an ad set chosen and an Instagram id pasted were all lost by navigating
+  // away first — and pasting that id is not something to do twice.
+  const hydrating = useRef<string | null>(null);
+  useEffect(() => {
+    if (!clientId) return;
+
+    // The first run after a client loads is the saved value arriving back, not
+    // a choice, and writing it again would be pointless.
+    if (hydrating.current !== clientId) {
+      hydrating.current = clientId;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void fetch(`/api/clients/${clientId}/defaults`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          meta_campaign_id: destination.campaignId || null,
+          meta_adset_id: destination.adSetId || null,
+          instagram_account_id: destination.instagramId || null,
+          default_batch_size: count,
+        }),
+      }).catch(() => {
+        // The next push writes it again; a failure here is not worth a message.
+      });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [clientId, destination, count]);
 
   async function generate() {
     if (!client) return;
@@ -246,19 +280,6 @@ export function LaunchView({
         }
       }
 
-      // Save the destination so the next launch for this client skips setup.
-      if (kind === "push") {
-        void fetch(`/api/clients/${clientId}/defaults`, {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            meta_campaign_id: destination.campaignId || null,
-            meta_adset_id: destination.adSetId || null,
-            instagram_account_id: destination.instagramId || null,
-            default_batch_size: count,
-          }),
-        });
-      }
 
       await refresh();
     } finally {

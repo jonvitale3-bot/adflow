@@ -43,7 +43,7 @@ export function DestinationPicker({
   const [campaigns, setCampaigns] = useState<Option[]>([]);
   const [adSets, setAdSets] = useState<Option[]>([]);
   const [instagram, setInstagram] = useState<
-    Array<{ id: string; username?: string; pageBacked?: boolean }>
+    Array<{ id: string; username?: string; pageBacked?: boolean; saved?: boolean }>
   >([]);
   const [igAttempts, setIgAttempts] = useState<
     Array<{ source: string; ok: boolean; found: number; error?: string }>
@@ -51,6 +51,14 @@ export function DestinationPicker({
   const [igNote, setIgNote] = useState<string | null>(null);
   const [creatingIg, setCreatingIg] = useState(false);
   const [manualIg, setManualIg] = useState("");
+
+  // A saved identity has to stay selectable even when the lookups cannot see
+  // it — which is exactly the case a pasted id exists for. Without this the
+  // select holds an id no option matches, so it renders as "Facebook only"
+  // while the ad pushes with the account: the screen and the launch disagree.
+  const igOptions = value.instagramId && !instagram.some((ig) => ig.id === value.instagramId)
+    ? [...instagram, { id: value.instagramId, saved: true }]
+    : instagram;
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -226,17 +234,18 @@ export function DestinationPicker({
           {/* Empty string, not the string "none" — the old build sent the
               literal word to Meta, which rejected it. */}
           <option value="">Facebook only</option>
-          {instagram.map((ig) => (
+          {igOptions.map((ig) => (
             <option key={ig.id} value={ig.id}>
               {ig.username ? `@${ig.username}` : ig.id}
               {ig.pageBacked ? " (via the Facebook Page)" : ""}
+              {ig.saved ? " (saved for this client)" : ""}
             </option>
           ))}
         </Select>
 
         {/* An empty list used to look the same whether the client has no
             Instagram identity or every lookup failed. It says which now. */}
-        {instagram.length === 0 && igAttempts.length > 0 && (
+        {!value.instagramId && instagram.length === 0 && igAttempts.length > 0 && (
           <div className="mt-1.5 rounded-md border border-border bg-surface-muted px-2.5 py-2">
             <p className="text-[12px] leading-[1.5] text-text-secondary">
               {igAttempts.every((a) => a.ok)

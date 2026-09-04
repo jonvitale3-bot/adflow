@@ -27,5 +27,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     .upsert({ client_id: id, ...parsed.data }, { onConflict: "client_id" });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // The Instagram account is an identity, not a destination, and everything
+  // that needs it reads the client: the push, the preview, the placement
+  // rules. Written here too, because it was only ever stored beside the
+  // campaign and ad set, so an account chosen on this screen never reached
+  // the ad it was chosen for.
+  if (parsed.data.instagram_account_id !== undefined) {
+    await supabase
+      .from("clients")
+      .update({ instagram_account_id: parsed.data.instagram_account_id })
+      .eq("id", id);
+  }
+
   return NextResponse.json({ ok: true });
 }
