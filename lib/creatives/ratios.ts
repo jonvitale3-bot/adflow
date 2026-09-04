@@ -21,7 +21,7 @@ export const RATIO_LABELS: Record<Ratio, string> = {
 export const RATIO_HINTS: Record<Ratio, string> = {
   square: "1:1 or 4:5 — Facebook and Instagram feed",
   vertical: "9:16 — stories and reels",
-  horizontal: "1.91:1 — right column and Audience Network",
+  horizontal: "1.91:1, Facebook right column",
 };
 
 // Feed images run from 4:5 (0.8) to a little past square. Anything meaningfully
@@ -71,10 +71,13 @@ export const PLACEMENTS: Record<Ratio, PlacementSpec> = {
     facebook_positions: ["story"],
     instagram_positions: ["story", "reels"],
   },
+  // Facebook only. Audience Network is a separate platform an account may not
+  // have enabled at all, and naming a platform the ad set does not run on is
+  // one more thing for Meta to reject in a rule set that has to be accepted
+  // whole. The spend there does not justify the risk to the rest.
   horizontal: {
-    publisher_platforms: ["facebook", "audience_network"],
+    publisher_platforms: ["facebook"],
     facebook_positions: ["right_hand_column"],
-    audience_network_positions: ["classic"],
   },
 };
 

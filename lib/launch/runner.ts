@@ -73,6 +73,7 @@ async function pushOne(
   client: ClientContext,
   adSetId: string,
   variationId: string,
+  run: RunState,
 ): Promise<void> {
   const { data: variation } = await db
     .from("ad_variations")
@@ -128,14 +129,16 @@ async function pushOne(
     throw new Error("Client has no landing page URL");
   }
 
-  // Per-placement assets, when this creative has any. The square already has a
-  // hash from above; the rest are uploaded once and remembered.
-  const assetFeedSpec = buildAssetFeedSpec({
-    assets: await syncRatioAssets(db, client, creative, imageHash),
-    message: variation.primary_text,
-    headline: variation.headline,
-    link,
-  });
+  // Per-placement assets, when this creative has any and the account has not
+  // already refused them in this run.
+  const assetFeedSpec = run.perPlacementRejected
+    ? null
+    : buildAssetFeedSpec({
+        assets: await syncRatioAssets(db, client, creative, imageHash),
+        message: variation.primary_text,
+        headline: variation.headline,
+        link,
+      });
 
   const base = {
     adAccountId: client.meta_ad_account_id,
@@ -161,7 +164,9 @@ async function pushOne(
   const specVariants = assetFeedSpec ? [assetFeedSpec, null] : [null];
 
   let metaCreativeId: string | null = null;
-  let pushNote: string | null = null;
+  let pushNote: string | null = run.perPlacementRejected
+    ? `Launched with one image for every placement. Meta rejected the per-placement version earlier in this launch: ${run.perPlacementRejected}`
+    : null;
   let lastError: unknown = null;
 
   outer: for (const spec of specVariants) {
@@ -173,9 +178,11 @@ async function pushOne(
           assetFeedSpec: spec,
         });
         if (assetFeedSpec && !spec) {
-          pushNote = `Launched with one image for every placement. Meta rejected the per-placement version: ${
-            lastError instanceof Error ? lastError.message : "unknown error"
-          }`;
+          const reason = lastError instanceof Error ? lastError.message : "unknown error";
+          // Remembered for the rest of the run, so the remaining ads go
+          // straight to the creative that works.
+          run.perPlacementRejected ??= reason;
+          pushNote = `Launched with one image for every placement. Meta rejected the per-placement version: ${reason}`;
         }
         break outer;
       } catch (err) {
@@ -271,6 +278,19 @@ async function syncRatioAssets(
 function ratioOfCreative(creative: PairedCreative): Ratio {
   if (!creative.width || !creative.height) return "square";
   return ratioOf(creative.width, creative.height);
+}
+
+/**
+ * What this run has learned about the account, shared across its workers.
+ *
+ * Per-placement creative is either accepted by an ad account or it is not, and
+ * the answer does not change between two ads pushed a second apart. Finding
+ * out once and remembering costs one rejected call; finding out per ad doubles
+ * every launch's calls to Meta and is a good way to be rate limited into
+ * failing ads that would otherwise have gone through.
+ */
+interface RunState {
+  perPlacementRejected: string | null;
 }
 
 /** What the push needs to know about the image an ad will run with. */
@@ -381,13 +401,23 @@ export async function runJobSlice(db: Db, jobId: string): Promise<RunResult> {
 
   const items = await claimItems(db, jobId, CONCURRENCY * 2);
 
+  // Shared by this slice's workers. It does not need to survive a resume: a
+  // later slice re-learns it on its first ad, which costs one call.
+  const run: RunState = { perPlacementRejected: null };
+
   if (items.length > 0) {
     const queue = [...items];
     const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
       for (let item = queue.shift(); item; item = queue.shift()) {
         try {
           if (job.kind === "push") {
-            await pushOne(db, client as ClientContext, job.meta_adset_id!, item.variation_id);
+            await pushOne(
+              db,
+              client as ClientContext,
+              job.meta_adset_id!,
+              item.variation_id,
+              run,
+            );
           } else {
             await rejectOne(db, item.variation_id, (client as ClientContext).meta_business);
           }

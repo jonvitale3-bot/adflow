@@ -68,7 +68,11 @@ export function ReviewGrid({
   const pushed = variations.filter((v) => v.status === "pushed");
   const failed = variations.filter((v) => v.status === "failed");
 
-  const shown = drafts.length > 0 ? drafts : pushed.length > 0 ? pushed : variations;
+  // A failed ad is the one you most need to read, and it was the one thing the
+  // grid never showed: with no drafts left it listed only what got through, so
+  // "6 failed" in the header pointed at nothing on screen.
+  const settled = variations.filter((v) => v.status === "pushed" || v.status === "failed");
+  const shown = drafts.length > 0 ? drafts : settled.length > 0 ? settled : variations;
   const unpaired = shown.filter((v) => !v.creatives?.image_url);
   const reviewingDrafts = drafts.length > 0;
 
@@ -88,6 +92,12 @@ export function ReviewGrid({
 
   const selectedIds = [...selected].filter((id) => shown.some((v) => v.id === id));
   const targetIds = selectedIds.length > 0 ? selectedIds : shown.map((v) => v.id);
+
+  // Rejecting removes an ad from the account, so it only applies to ads that
+  // reached it. A failed variation has nothing in Meta to remove.
+  const rejectable = targetIds.filter((id) =>
+    variations.some((v) => v.id === id && v.status === "pushed"),
+  );
 
   return (
     <div className="rounded-lg border border-border bg-surface shadow-raised">
@@ -146,18 +156,18 @@ export function ReviewGrid({
               <Button onClick={onRefresh} disabled={busy !== null}>Refresh</Button>
               <Button
                 variant="danger"
-                disabled={busy !== null || targetIds.length === 0}
+                disabled={busy !== null || rejectable.length === 0}
                 onClick={() => {
                   if (
                     confirm(
-                      `Delete ${targetIds.length} ad${targetIds.length === 1 ? "" : "s"} from Meta? This removes the paused drafts from the ad account.`,
+                      `Delete ${rejectable.length} ad${rejectable.length === 1 ? "" : "s"} from Meta? This removes the paused drafts from the ad account.`,
                     )
                   ) {
-                    onReject(targetIds);
+                    onReject(rejectable);
                   }
                 }}
               >
-                {busy === "reject" ? "Removing…" : `Reject ${targetIds.length}`}
+                {busy === "reject" ? "Removing…" : `Reject ${rejectable.length}`}
               </Button>
             </>
           )}
@@ -225,7 +235,11 @@ export function ReviewGrid({
                 onClick={() => toggle(v.id)}
                 className={cn(
                   "cursor-pointer overflow-hidden rounded-lg border transition-colors duration-150",
-                  isSelected ? "border-accent bg-accent-subtle" : "border-border bg-surface hover:bg-surface-muted",
+                  isSelected
+                    ? "border-accent bg-accent-subtle"
+                    : v.status === "failed"
+                      ? "border-danger-border bg-danger-subtle hover:bg-surface-muted"
+                      : "border-border bg-surface hover:bg-surface-muted",
                 )}
               >
                 <div className="flex gap-3 p-3">
@@ -281,7 +295,10 @@ export function ReviewGrid({
                 {(v.status === "failed" || v.meta_ad_id) && (
                   <div className="border-t border-border px-3 py-2">
                     {v.status === "failed" ? (
-                      <p className="text-[11px] text-danger-on-subtle">! {v.error}</p>
+                      <p className="text-[11px] leading-[1.45] text-danger-on-subtle">
+                        <span className="font-[550]">Not created. </span>
+                        {v.error}
+                      </p>
                     ) : (
                       <p className="font-mono text-[11px] text-text-tertiary">
                         Ad {v.meta_ad_id} · paused

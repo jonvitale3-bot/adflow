@@ -322,25 +322,30 @@ export async function createAdCreative(input: CreateCreativeInput): Promise<stri
   // placement, the other animates it. Neither is safe over designed-in copy,
   // so an image carrying its own headline opts out of both and is delivered
   // as authored — fitted to the placement rather than cropped into it.
-  //
-  // Per-placement assets opt out too, always: the whole point of supplying a
-  // designed vertical is that nothing has to be derived from the square.
-  const enroll = input.adaptToPlacement && !input.assetFeedSpec ? "OPT_IN" : "OPT_OUT";
+  const enroll = input.adaptToPlacement ? "OPT_IN" : "OPT_OUT";
 
   const form = new URLSearchParams({
     name: input.name,
     object_story_spec: JSON.stringify(spec),
     url_tags: input.urlTags,
-    degrees_of_freedom_spec: JSON.stringify({
-      creative_features_spec: {
-        adapt_to_placement: { enroll_status: enroll },
-        media_liquidity_animated_image: { enroll_status: enroll },
-      },
-    }),
   });
 
   if (input.assetFeedSpec) {
     form.set("asset_feed_spec", JSON.stringify(input.assetFeedSpec));
+    // No degrees_of_freedom_spec alongside it. Both fields tell Meta how it
+    // may vary the creative per placement, and the asset feed already answers
+    // that completely: this image here, that image there. Sending the two
+    // together is a contradiction, and the failure it produces is generic.
+  } else {
+    form.set(
+      "degrees_of_freedom_spec",
+      JSON.stringify({
+        creative_features_spec: {
+          adapt_to_placement: { enroll_status: enroll },
+          media_liquidity_animated_image: { enroll_status: enroll },
+        },
+      }),
+    );
   }
 
   const body = await request<{ id: string }>(url(`${input.adAccountId}/adcreatives`), {
