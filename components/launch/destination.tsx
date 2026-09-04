@@ -45,6 +45,11 @@ export function DestinationPicker({
   const [instagram, setInstagram] = useState<
     Array<{ id: string; username?: string; pageBacked?: boolean }>
   >([]);
+  const [igAttempts, setIgAttempts] = useState<
+    Array<{ source: string; ok: boolean; found: number; error?: string }>
+  >([]);
+  const [igNote, setIgNote] = useState<string | null>(null);
+  const [creatingIg, setCreatingIg] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,9 +82,45 @@ export function DestinationPicker({
     if (business) params.set("business", business);
     void fetch(`/api/meta/instagram?${params}`)
       .then((r) => r.json())
-      .then((b) => setInstagram(b.accounts ?? []))
-      .catch(() => setInstagram([]));
+      .then((b) => {
+        setInstagram(b.accounts ?? []);
+        setIgAttempts(b.attempts ?? []);
+      })
+      .catch(() => {
+        setInstagram([]);
+        setIgAttempts([]);
+      });
   }, [adAccountId, pageId, business]);
+
+  /**
+   * Asks Meta for a Page-backed Instagram account.
+   *
+   * Meta creates one by itself the first time an ad needs an Instagram
+   * identity, but a creative cannot claim an Instagram placement before it
+   * exists. Behind a button because it writes to the client's Page.
+   */
+  async function createPageBackedIg() {
+    if (!pageId) return;
+    setCreatingIg(true);
+    setIgNote(null);
+    try {
+      const res = await fetch("/api/meta/instagram", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pageId, business }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setIgNote(body.error ?? "Could not create the account");
+        return;
+      }
+      setInstagram((prev) => [...prev, { ...body.account, pageBacked: true }]);
+      onChange({ ...value, instagramId: body.account.id });
+      setIgNote("Created. Instagram placements can be used now.");
+    } finally {
+      setCreatingIg(false);
+    }
+  }
 
   const loadAdSets = useCallback(
     async (campaignId: string) => {
@@ -170,26 +211,64 @@ export function DestinationPicker({
         onChange={(id) => onChange({ ...value, adSetId: id })}
       />
 
-      <Select
-        label="Instagram account"
-        value={value.instagramId}
-        hint={
-          value.instagramId
-            ? "Ads run on Instagram as this identity."
-            : "Optional, but without one the ad cannot run on Instagram at all, so a vertical size will only serve Facebook stories."
-        }
-        onChange={(e) => onChange({ ...value, instagramId: e.target.value })}
-      >
-        {/* Empty string, not the string "none" — the old build sent the literal
-            word to Meta, which rejected it. */}
-        <option value="">Facebook only</option>
-        {instagram.map((ig) => (
-          <option key={ig.id} value={ig.id}>
-            {ig.username ? `@${ig.username}` : ig.id}
-            {ig.pageBacked ? " (via the Facebook Page)" : ""}
-          </option>
-        ))}
-      </Select>
+      <div>
+        <Select
+          label="Instagram account"
+          value={value.instagramId}
+          hint={
+            value.instagramId
+              ? "Ads run on Instagram as this identity."
+              : "Optional, but without one the ad cannot run on Instagram at all, so a vertical size will only serve Facebook stories."
+          }
+          onChange={(e) => onChange({ ...value, instagramId: e.target.value })}
+        >
+          {/* Empty string, not the string "none" — the old build sent the
+              literal word to Meta, which rejected it. */}
+          <option value="">Facebook only</option>
+          {instagram.map((ig) => (
+            <option key={ig.id} value={ig.id}>
+              {ig.username ? `@${ig.username}` : ig.id}
+              {ig.pageBacked ? " (via the Facebook Page)" : ""}
+            </option>
+          ))}
+        </Select>
+
+        {/* An empty list used to look the same whether the client has no
+            Instagram identity or every lookup failed. It says which now. */}
+        {instagram.length === 0 && igAttempts.length > 0 && (
+          <div className="mt-1.5 rounded-md border border-border bg-surface-muted px-2.5 py-2">
+            <p className="text-[12px] text-text-secondary">
+              {igAttempts.every((a) => a.ok)
+                ? "This Page has no Instagram identity yet. Meta makes one the first time an ad needs it, but a per-placement ad has to name it up front."
+                : "Meta could not be asked for this client's Instagram identity."}
+            </p>
+
+            <ul className="mt-1.5 space-y-0.5">
+              {igAttempts.map((a) => (
+                <li key={a.source} className="font-mono text-[11px] text-text-tertiary">
+                  {a.ok ? `○ ${a.source}: none` : `! ${a.source}: ${a.error}`}
+                </li>
+              ))}
+            </ul>
+
+            {pageId && igAttempts.every((a) => a.ok) && (
+              <Button
+                size="row"
+                className="mt-2"
+                disabled={creatingIg}
+                onClick={createPageBackedIg}
+                title="Creates a Page-backed Instagram account on this client's Facebook Page. It is used only by ads and nobody posts from it."
+              >
+                {creatingIg ? "Creating…" : "Create one from the Page"}
+              </Button>
+            )}
+
+            {igNote && (
+              <p className="mt-1.5 text-[12px] text-text-secondary">{igNote}</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

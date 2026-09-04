@@ -180,33 +180,52 @@ export interface InstagramAccount {
  * Unlike the old build, `pageId` is actually threaded through by callers —
  * previously it was never passed, so two of these three never ran.
  */
+export interface InstagramLookup {
+  accounts: InstagramAccount[];
+  /**
+   * What each endpoint said. Four sources are tried and merged, and until this
+   * existed a failure was indistinguishable from an empty result: the picker
+   * showed nothing either way, with no way to tell whether the account has no
+   * Instagram identity or the token cannot see one.
+   */
+  attempts: Array<{ source: string; ok: boolean; found: number; error?: string }>;
+}
+
 export async function listInstagramAccounts(
   adAccountId: string,
   pageId?: string,
   business?: string | null,
-): Promise<InstagramAccount[]> {
+): Promise<InstagramLookup> {
   const acct = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
 
-  const sources: Array<() => Promise<InstagramAccount[]>> = [
-    () =>
-      paginate<InstagramAccount>(
-        url(`${acct}/instagram_accounts`, { fields: "id,username", limit: "100" }),
-        business,
-      ),
+  const sources: Array<{ name: string; run: () => Promise<InstagramAccount[]> }> = [
+    {
+      name: "ad account instagram_accounts",
+      run: () =>
+        paginate<InstagramAccount>(
+          url(`${acct}/instagram_accounts`, { fields: "id,username", limit: "100" }),
+          business,
+        ),
+    },
   ];
 
   if (pageId) {
-    sources.push(() =>
-      paginate<InstagramAccount>(
-        url(`${pageId}/instagram_accounts`, { fields: "id,username", limit: "100" }),
-        business,
-      ),
-    );
-    sources.push(async () => {
-      const body = await request<{
-        instagram_business_account?: InstagramAccount;
-      }>(url(pageId, { fields: "instagram_business_account{id,username}" }), { business });
-      return body.instagram_business_account ? [body.instagram_business_account] : [];
+    sources.push({
+      name: "page instagram_accounts",
+      run: () =>
+        paginate<InstagramAccount>(
+          url(`${pageId}/instagram_accounts`, { fields: "id,username", limit: "100" }),
+          business,
+        ),
+    });
+    sources.push({
+      name: "page instagram_business_account",
+      run: async () => {
+        const body = await request<{
+          instagram_business_account?: InstagramAccount;
+        }>(url(pageId, { fields: "instagram_business_account{id,username}" }), { business });
+        return body.instagram_business_account ? [body.instagram_business_account] : [];
+      },
     });
 
     // The Page-backed account, which is what Meta falls back to on its own
@@ -214,29 +233,62 @@ export async function listInstagramAccounts(
     // identity that appears on the draft in Ads Manager, and without naming it
     // a creative cannot claim an Instagram placement at all. Listed last, so a
     // real Instagram account is preferred where one exists.
-    sources.push(async () => {
-      const rows = await paginate<InstagramAccount>(
-        url(`${pageId}/page_backed_instagram_accounts`, {
-          fields: "id,username",
-          limit: "25",
-        }),
-        business,
-      );
-      return rows.map((row) => ({ ...row, pageBacked: true }));
+    sources.push({
+      name: "page_backed_instagram_accounts",
+      run: async () => {
+        const rows = await paginate<InstagramAccount>(
+          url(`${pageId}/page_backed_instagram_accounts`, {
+            fields: "id,username",
+            limit: "25",
+          }),
+          business,
+        );
+        return rows.map((row) => ({ ...row, pageBacked: true }));
+      },
     });
   }
 
-  const settled = await Promise.allSettled(sources.map((fn) => fn()));
+  const settled = await Promise.allSettled(sources.map((source) => source.run()));
   const merged = new Map<string, InstagramAccount>();
+  const attempts: InstagramLookup["attempts"] = [];
 
-  for (const result of settled) {
-    if (result.status !== "fulfilled") continue;
+  for (const [i, result] of settled.entries()) {
+    const name = sources[i]!.name;
+    if (result.status !== "fulfilled") {
+      attempts.push({
+        source: name,
+        ok: false,
+        found: 0,
+        error: result.reason instanceof Error ? result.reason.message : "Request failed",
+      });
+      continue;
+    }
+    attempts.push({ source: name, ok: true, found: result.value.length });
     for (const account of result.value) {
       if (!merged.has(account.id)) merged.set(account.id, account);
     }
   }
 
-  return [...merged.values()];
+  return { accounts: [...merged.values()], attempts };
+}
+
+/**
+ * Creates the Page-backed Instagram account.
+ *
+ * Meta makes one of these by itself the first time an ad needs an Instagram
+ * identity, but a creative cannot claim an Instagram placement before it
+ * exists, so an ad built with per-placement assets has to ask for it up front.
+ * It belongs to the Page, is used only by ads, and nobody posts from it.
+ */
+export async function createPageBackedInstagramAccount(
+  pageId: string,
+  business?: string | null,
+): Promise<InstagramAccount> {
+  const body = await request<{ id: string }>(
+    url(`${pageId}/page_backed_instagram_accounts`),
+    { method: "POST", body: new URLSearchParams(), business },
+  );
+  return { id: body.id, pageBacked: true };
 }
 
 // ---------------------------------------------------------------------------
