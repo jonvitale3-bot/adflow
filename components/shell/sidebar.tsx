@@ -79,6 +79,25 @@ export function Sidebar({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
 
+  // Remembered per browser. Read after mount rather than during render, so the
+  // server and the first client render agree.
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem("adflow:sidebar") === "collapsed");
+    } catch {
+      // Private windows and blocked site data throw on access.
+    }
+  }, []);
+
+  function toggle(next: boolean) {
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem("adflow:sidebar", next ? "collapsed" : "expanded");
+    } catch {
+      // The preference is a convenience, never a requirement.
+    }
+  }
+
   // Collapse automatically on a narrow window, per the handoff.
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
@@ -104,23 +123,50 @@ export function Sidebar({
       // have to scroll back for, and these screens are long.
       className="sticky top-0 flex h-dvh shrink-0 flex-col overflow-y-auto border-r border-border bg-background px-2.5 py-3 transition-[width] duration-200 ease-out"
     >
-      <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
-        <div className="flex items-center gap-2">
-          <div aria-hidden className="h-5 w-5 shrink-0 rounded-[5px] bg-accent" />
-          {!collapsed && <span className="text-[14px] font-semibold">AdFlow</span>}
-        </div>
-        {!collapsed && (
+      {/* Collapsed, there is no room for a logo and a control beside it, so the
+          logo becomes the control: the chevron takes its place on hover. The
+          toggle is always present either way, because a sidebar that collapses
+          and cannot reopen is a one-way door. */}
+      {collapsed ? (
+        <button
+          onClick={() => toggle(false)}
+          aria-label="Expand sidebar"
+          aria-expanded={false}
+          title="Expand sidebar"
+          className="group flex h-5 items-center justify-center rounded focus-visible:focus-ring"
+        >
+          <span
+            aria-hidden
+            className="h-5 w-5 rounded-[5px] bg-accent group-hover:hidden group-focus-visible:hidden"
+          />
+          <svg
+            viewBox="0 0 12 12"
+            width={12}
+            height={12}
+            {...stroke}
+            className="hidden text-text-secondary group-hover:block group-focus-visible:block"
+          >
+            <path d="M4.5 2.5L8 6l-3.5 3.5" />
+          </svg>
+        </button>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div aria-hidden className="h-5 w-5 shrink-0 rounded-[5px] bg-accent" />
+            <span className="text-[14px] font-semibold">AdFlow</span>
+          </div>
           <button
-            onClick={() => setCollapsed(true)}
+            onClick={() => toggle(true)}
             aria-label="Collapse sidebar"
-            className="rounded p-1 text-text-tertiary hover:text-text-primary"
+            aria-expanded
+            className="rounded p-1 text-text-tertiary hover:text-text-primary focus-visible:focus-ring"
           >
             <svg viewBox="0 0 12 12" width={12} height={12} {...stroke}>
               <path d="M7.5 2.5L4 6l3.5 3.5" />
             </svg>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <ul className="mt-3.5 flex flex-col gap-0.5">
         {NAV.map((item) => {
