@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/skeleton";
 import { Input, Select, Textarea } from "@/components/ui/field";
+import { PagePicker } from "@/components/clients/page-picker";
 import { cn } from "@/lib/cn";
 import { industryLabel } from "@/lib/clients/grouping";
 import {
@@ -430,14 +431,12 @@ export function ClientPanel({
               </Select>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3.5">
-            <Input
-              label="Facebook Page ID"
-              mono
+          <div className="flex flex-col gap-3.5">
+            <PagePicker
+              value={values.meta_page_id ?? ""}
+              business={values.meta_business || null}
               error={errors.meta_page_id}
-              value={values.meta_page_id}
-              aiFilled={aiFields.has("meta_page_id")}
-              onChange={(e) => set("meta_page_id", e.target.value)}
+              onChange={(id) => set("meta_page_id", id)}
             />
             <Input
               label="Ad Account ID"
