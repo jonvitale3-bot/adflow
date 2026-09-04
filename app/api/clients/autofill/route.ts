@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { autofillClientFields } from "@/lib/generation/autofill";
-import { stripInventedOffer } from "@/lib/generation/offer-guard";
+import { guardOffer } from "@/lib/generation/offer-guard";
 import { createClient } from "@/lib/supabase/server";
 
 // Fetching a landing page and reasoning over it runs past the default.
@@ -38,7 +38,9 @@ export async function POST(request: Request) {
       landingPageUrl: parsed.data.landingPageUrl ?? null,
     });
 
-    const { values, stripped } = stripInventedOffer(result.values);
+    const { values, verdict } = guardOffer(result.values, {
+      sourcedFromPage: result.sourcedFromPage,
+    });
 
     const notes: string[] = [];
     if (result.sourcedFromPage) {
@@ -49,11 +51,18 @@ export async function POST(request: Request) {
       notes.push("No landing page set, so these are inferred from the name and location.");
     }
     if (result.pixelId) notes.push("Found the Meta pixel on the page.");
-    // Surfaced rather than swallowed, so a recurring problem stays visible.
-    if (stripped) notes.push("An invented offer was removed — fill in the real one yourself.");
+    if (verdict === "needs_confirming") {
+      // Kept, because it was read off the client's own page — but a misread
+      // offer in a live ad is still expensive, so it gets a second look.
+      notes.push("The offer names specifics — check it matches the page before saving.");
+    }
+    if (verdict === "stripped") {
+      notes.push("An invented offer was removed — fill in the real one yourself.");
+    }
 
     return NextResponse.json({
       values: { ...values, meta_pixel_id: result.pixelId ?? "" },
+      offerNeedsConfirming: verdict === "needs_confirming",
       notice: notes.join(" "),
       sourcedFromPage: result.sourcedFromPage,
     });

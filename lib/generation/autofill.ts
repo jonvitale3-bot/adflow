@@ -9,7 +9,7 @@ import { requireEnv } from "@/lib/env";
 import { htmlToText } from "./discover-pages.ts";
 import { extractPixelId } from "./extract.ts";
 
-export { stripInventedOffer } from "./offer-guard.ts";
+export { guardOffer } from "./offer-guard.ts";
 
 /**
  * Prefills client fields.
