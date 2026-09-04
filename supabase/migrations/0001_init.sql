@@ -482,3 +482,28 @@ alter table public.clients
 
 comment on column public.clients.marine_business_types is
   'Services this marina offers. First element is primary and selects the prompt template; all elements contribute scenes. The scalar marine_business_type retains the primary value.';
+
+-- ---------------------------------------------------------------------------
+-- Image-matched copy.
+--
+-- A short description of what each creative depicts, so copy can be written to
+-- the image it will run with rather than paired blind. Generated creatives
+-- derive it from their scene at no cost; uploads need a vision pass, done once
+-- per image.
+-- ---------------------------------------------------------------------------
+
+alter table public.clients
+  add column match_copy_to_image boolean not null default true;
+
+alter table public.creatives
+  add column description text,
+  add column described_at timestamptz;
+
+comment on column public.creatives.description is
+  'One line describing what the image depicts. Fed to copy generation so a variation speaks to the photo it runs with.';
+
+comment on column public.clients.match_copy_to_image is
+  'When true, copy is written to the creative it is paired with. When false, copy and images stay independent so one photo can carry any headline.';
+
+create index creatives_undescribed_idx on public.creatives (client_id)
+  where description is null and not archived;

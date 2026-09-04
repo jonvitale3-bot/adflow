@@ -24,6 +24,7 @@ const RequestSchema = z.object({
   adExamples: z.string().optional(),
   count: z.number().int().min(1).max(50).default(10),
   timeZone: z.string().default("America/New_York"),
+  pairedImages: z.array(z.string().nullable()).optional(),
 });
 
 export async function POST(request: Request) {
@@ -73,6 +74,7 @@ export async function POST(request: Request) {
       },
       count: input.count,
       timeZone: input.timeZone,
+      pairedImages: input.pairedImages,
     });
 
     return NextResponse.json(result);

@@ -18,6 +18,7 @@ export interface GenerateCopyResult {
   systemPrompt: string;
   model: string;
   usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number };
+  matchedToImages: boolean;
 }
 
 const MODEL = "claude-opus-5";
@@ -79,6 +80,7 @@ export async function generateCopy(input: CopyPromptInput): Promise<GenerateCopy
 
   return {
     variations: parsed.variations.map((v) => ({ ...v, warnings: validate(v) })),
+    matchedToImages: (input.pairedImages ?? []).some(Boolean),
     systemPrompt,
     model: MODEL,
     usage: {

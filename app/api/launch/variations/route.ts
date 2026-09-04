@@ -16,6 +16,7 @@ const BodySchema = z.object({
     )
     .min(1)
     .max(50),
+  creativeIds: z.array(z.string().uuid().nullable()).optional(),
 });
 
 /** Persists a generated batch and pairs it with the client's creatives. */
@@ -29,17 +30,21 @@ export async function POST(request: Request) {
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
-  const { clientId, variations } = parsed.data;
+  const { clientId, variations, creativeIds } = parsed.data;
 
   // Archived creatives are excluded from new pairings but stay attached to
   // variations already made from them.
   const { data: creatives } = await supabase
     .from("creatives")
-    .select("id, created_at")
+    .select("id, created_at, description")
     .eq("client_id", clientId)
     .eq("archived", false);
 
-  const pairing = pairWithCreatives(variations.length, creatives ?? []);
+  // Honour the pairing the copy was written for; fall back to round-robin.
+  const pairing =
+    creativeIds?.length === variations.length
+      ? creativeIds
+      : pairWithCreatives(variations.length, creatives ?? []);
 
   const { data, error } = await supabase
     .from("ad_variations")

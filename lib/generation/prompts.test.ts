@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildBrandContext, buildSystemPrompt, type CopyPromptInput } from "./prompts.ts";
+import {
+  buildBrandContext,
+  buildSystemPrompt,
+  buildUserMessage,
+  type CopyPromptInput,
+} from "./prompts.ts";
 import { pairWithCreatives } from "./pairing.ts";
 
 function input(over: Partial<CopyPromptInput> = {}): CopyPromptInput {
@@ -81,4 +86,34 @@ test("creative pairing is deterministic regardless of input order", () => {
 
 test("pairing yields nulls when the client has no creatives", () => {
   assert.deepEqual(pairWithCreatives(3, []), [null, null, null]);
+});
+
+test("image pairing stays OUT of the cached system prompt", () => {
+  // The list changes every request. In the system prompt it would invalidate
+  // the cache on every call.
+  const withImages = buildSystemPrompt(
+    input({ pairedImages: ["Cruising at golden hour", "Fishing at sunrise"] }),
+  );
+  const without = buildSystemPrompt(input());
+  assert.equal(withImages, without, "system prompt must not vary with the image list");
+});
+
+test("image pairing appears in the user message, numbered in order", () => {
+  const msg = buildUserMessage(
+    input({ pairedImages: ["Cruising at golden hour", "Fishing at sunrise"] }),
+  );
+  assert.match(msg, /IMAGE PAIRING/);
+  assert.match(msg, /1\. Cruising at golden hour/);
+  assert.match(msg, /2\. Fishing at sunrise/);
+  assert.match(msg, /Variation 1 runs with image 1/);
+});
+
+test("a variation with no image is told to stand alone", () => {
+  const msg = buildUserMessage(input({ pairedImages: ["A dock at sunset", null] }));
+  assert.match(msg, /2\. \(no image — write it standalone\)/);
+});
+
+test("no image descriptions means no pairing section at all", () => {
+  assert.doesNotMatch(buildUserMessage(input()), /IMAGE PAIRING/);
+  assert.doesNotMatch(buildUserMessage(input({ pairedImages: [null, null] })), /IMAGE PAIRING/);
 });

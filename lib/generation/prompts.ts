@@ -29,6 +29,11 @@ export interface CopyPromptInput {
   count: number;
   timeZone: string;
   now?: Date;
+  /**
+   * What each variation's image depicts, in order. When present the copy is
+   * written to the photo it will run with rather than paired blind.
+   */
+  pairedImages?: Array<string | null>;
 }
 
 const DEFAULT_BOAT_CLUB_VOICE = `
@@ -88,6 +93,37 @@ const HEADLINE_RULES = `HEADLINE RULES (CRITICAL):
 - NO clever metaphors that require a second read. Say what the offer is.
 - Good headlines: "Boating Without The Headaches", "Your Boat Is Waiting", "Skip Ownership. Keep The Weekends.", "Members Boat Every Weekend", "All The Fun. None Of The Work.", "Unlimited Boating. Zero Hassle."
 - Bad headlines (do NOT generate these): "Easy As Show Up", "Boating Made Simple As Pie", "Just Add Water", anything that reads like a tagline puzzle.`;
+
+
+/**
+ * Ties each variation to the photo it will run with.
+ *
+ * Images are the expensive artifact — 40-60 seconds and real money each — so
+ * the copy adapts to them rather than the other way round. Without this the
+ * pairing is arbitrary and a fishing-at-sunrise photo can end up carrying
+ * watersports copy.
+ */
+function buildImagePairingSection(pairedImages: Array<string | null> | undefined): string {
+  const described = (pairedImages ?? []).filter(Boolean);
+  if (described.length === 0) return "";
+
+  const lines = (pairedImages ?? [])
+    .map((description, i) =>
+      description ? `${i + 1}. ${description}` : `${i + 1}. (no image — write it standalone)`,
+    )
+    .join("\n");
+
+  return `
+IMAGE PAIRING (IMPORTANT):
+Each variation runs with a specific photo, listed below in order. Variation 1 runs with image 1, variation 2 with image 2, and so on.
+
+Write each variation so it belongs with its image. The copy and the photo are one ad: if the photo shows an early-morning fishing scene, that variation should not be about family watersports. Reference what is in the frame naturally — never describe the photo literally, and never say "pictured above" or "as shown".
+
+Where a variation has no image, write it standalone.
+
+${lines}
+`;
+}
 
 export function buildBoatClubPrompt(input: CopyPromptInput): string {
   const brandContext = buildBrandContext(input.brand, input.clientName.split(/\s+[-–—]\s+/)[0] ?? "");
@@ -227,7 +263,13 @@ export function buildSystemPrompt(input: CopyPromptInput): string {
 }
 
 export function buildUserMessage(input: CopyPromptInput): string {
-  return input.industry === "boat_club"
-    ? `Write Meta ad copy for this boat club location: ${input.locationDescription}. Generate exactly ${input.count} variations with a balanced mix of all 6 angles.`
-    : `Write Meta ad copy for ${input.clientName || "this business"} (${input.locationDescription || "no location"}). Generate exactly ${input.count} variations with a balanced mix of all 6 angles.`;
+  const ask =
+    input.industry === "boat_club"
+      ? `Write Meta ad copy for this boat club location: ${input.locationDescription}. Generate exactly ${input.count} variations with a balanced mix of all 6 angles.`
+      : `Write Meta ad copy for ${input.clientName || "this business"} (${input.locationDescription || "no location"}). Generate exactly ${input.count} variations with a balanced mix of all 6 angles.`;
+
+  // The image list changes every request, so it lives here rather than in the
+  // system prompt — anything volatile in the cached prefix means the cache
+  // never hits.
+  return ask + buildImagePairingSection(input.pairedImages);
 }

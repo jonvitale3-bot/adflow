@@ -61,6 +61,7 @@ export function LaunchView({
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
   const [creativeCount, setCreativeCount] = useState(0);
+  const [matchToImage, setMatchToImage] = useState(true);
   const [importing, setImporting] = useState(false);
 
   const client = clients.find((c) => c.id === clientId);
@@ -95,6 +96,39 @@ export function LaunchView({
     setBusy("generate");
     setMessage(null);
     try {
+      // Fix the images first, then write copy to them. Images are the
+      // expensive artifact, so the copy adapts rather than the reverse.
+      let plan: { creativeIds: Array<string | null>; descriptions: Array<string | null> } | null =
+        null;
+
+      if (matchToImage && creativeCount > 0) {
+        const planRes = await fetch("/api/launch/plan", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ clientId, count }),
+        });
+        const planBody = await planRes.json();
+        if (planRes.ok) {
+          plan = planBody;
+          if (planBody.undescribed > 0) {
+            setBusy("describe");
+            await fetch("/api/creatives/describe", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ clientId }),
+            });
+            // Re-plan so the descriptions just written are the ones used.
+            const retry = await fetch("/api/launch/plan", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ clientId, count }),
+            });
+            if (retry.ok) plan = await retry.json();
+            setBusy("generate");
+          }
+        }
+      }
+
       const res = await fetch("/api/generate/copy", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -108,6 +142,7 @@ export function LaunchView({
           offerDescription: client.offer_description ?? undefined,
           toneKeywords: client.tone_keywords ?? undefined,
           count,
+          pairedImages: plan?.descriptions,
         }),
       });
       const body = await res.json();
@@ -120,7 +155,12 @@ export function LaunchView({
       const saveRes = await fetch("/api/launch/variations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ clientId, variations: body.variations }),
+        body: JSON.stringify({
+          clientId,
+          variations: body.variations,
+          // Use the same pairing the copy was written for.
+          creativeIds: plan?.creativeIds,
+        }),
       });
       const saved = await saveRes.json();
       if (!saveRes.ok) {
@@ -298,6 +338,21 @@ export function LaunchView({
                 onChange={setDestination}
               />
 
+              <label className="flex items-start gap-2 rounded-md border border-border p-2.5">
+                <input
+                  type="checkbox"
+                  checked={matchToImage}
+                  onChange={(e) => setMatchToImage(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded-sm accent-[var(--color-accent)]"
+                />
+                <span className="text-[12px] leading-[1.45] text-text-secondary">
+                  <span className="font-[550] text-text-primary">Write copy to each image</span>
+                  <br />
+                  Pairs images first, then writes each ad for the photo it runs with. Uncheck
+                  to keep copy and images independent.
+                </span>
+              </label>
+
               <Select
                 label="Ads to generate"
                 value={String(count)}
@@ -328,7 +383,11 @@ export function LaunchView({
               disabled={busy !== null || !client}
               onClick={generate}
             >
-              {busy === "generate" ? "Generating copy…" : `Generate ${count} ads`}
+              {busy === "describe"
+                ? "Looking at your images…"
+                : busy === "generate"
+                  ? "Writing copy…"
+                  : `Generate ${count} ads`}
             </Button>
 
             <Button
