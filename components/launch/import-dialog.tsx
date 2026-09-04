@@ -210,8 +210,9 @@ export function ImportDialog({
 
               {warningCount > 0 && (
                 <p className="mt-2 text-[12px] leading-[1.5] text-text-tertiary">
-                  Warnings flag copy that breaks the house rules — line counts, banned CTA
-                  verbs, month names. They do not block the import; your copy is your call.
+                  Warnings flag copy that breaks the house rules: banned CTA verbs, month
+                  names, dashes, numeric social proof. They do not block the import; your
+                  copy is your call.
                 </p>
               )}
 
@@ -249,7 +250,7 @@ export function ImportDialog({
                       <ul className="mt-2 space-y-0.5 border-t border-border pt-2">
                         {row.warnings.map((w, i) => (
                           <li key={i} className="text-[11px] text-warning-on-subtle">
-                            {w.rule} — {w.detail}
+                            ▲ {w.detail}
                           </li>
                         ))}
                       </ul>

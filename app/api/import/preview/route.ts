@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
+import { decodeSheetBytes } from "@/lib/import/decode";
 import { applyMapping, suggestMapping, type ImportField } from "@/lib/import/parse";
 import { validateVariation } from "@/lib/generation/validate";
 import { createClient } from "@/lib/supabase/server";
@@ -32,9 +33,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File is larger than 5 MB" }, { status: 400 });
   }
 
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  // A CSV is bytes until something says what encoding they are in. Handing
+  // them to the parser raw made it guess, and it guessed Windows-1252, so a
+  // UTF-8 sheet arrived with every dash, star and ellipsis in pieces.
+  const decoded = decodeSheetBytes(bytes);
+
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+    workbook =
+      decoded.kind === "binary"
+        ? XLSX.read(bytes, { type: "array" })
+        : XLSX.read(decoded.text, { type: "string" });
   } catch {
     return NextResponse.json(
       { error: "Could not read that file. Export it as .xlsx or .csv and try again." },
