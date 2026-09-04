@@ -24,6 +24,7 @@ const EMPTY: ClientFormValues = {
   industry: "boat_club",
   marine_business_type: "",
   special_ad_category: "none",
+  meta_business: "",
   location_description: "",
   meta_page_id: "",
   meta_ad_account_id: "",
@@ -70,6 +71,7 @@ export function ClientPanel({
   const [autofilling, setAutofilling] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [businesses, setBusinesses] = useState<Array<{ key: string; label: string }>>([]);
 
   useEffect(() => {
     setValues({ ...EMPTY, ...initial });
@@ -77,6 +79,14 @@ export function ClientPanel({
     setAiFields(new Set());
     setFormError(null);
   }, [initial, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    void fetch("/api/settings/businesses")
+      .then((r) => r.json())
+      .then((b) => setBusinesses(b.businesses ?? []))
+      .catch(() => setBusinesses([]));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -329,6 +339,22 @@ export function ClientPanel({
           </div>
 
           <SectionHeading>Meta connection</SectionHeading>
+          {businesses.length > 1 && (
+            <div className="mb-3.5">
+              <Select
+                label="Business portfolio"
+                hint="Which Business Manager this client's ad account lives in. One token cannot see across portfolios."
+                value={values.meta_business ?? ""}
+                onChange={(e) => set("meta_business", e.target.value)}
+              >
+                {businesses.map((b) => (
+                  <option key={b.key} value={b.key === "default" ? "" : b.key}>
+                    {b.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3.5">
             <Input
               label="Facebook Page ID"

@@ -10,13 +10,15 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const adAccountId = new URL(request.url).searchParams.get("adAccountId");
+  const params = new URL(request.url).searchParams;
+  const adAccountId = params.get("adAccountId");
+  const business = params.get("business");
   if (!adAccountId) {
     return NextResponse.json({ error: "adAccountId is required" }, { status: 400 });
   }
 
   try {
-    const campaigns = await listCampaigns(adAccountId);
+    const campaigns = await listCampaigns(adAccountId, business);
     return NextResponse.json({ campaigns });
   } catch (err) {
     const message = err instanceof MetaApiError ? err.message : "Could not load campaigns";

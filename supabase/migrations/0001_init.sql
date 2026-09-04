@@ -436,3 +436,22 @@ create policy "Authenticated can update creatives"
 create policy "Authenticated can delete creatives"
   on storage.objects for delete to authenticated
   using (bucket_id = 'creatives');
+
+-- ---------------------------------------------------------------------------
+-- Multiple Meta business portfolios.
+--
+-- One system-user token cannot see across Business Managers, and the client
+-- roster spans more than one. This column records WHICH token to use — a key
+-- mapping to an environment variable — never the token itself. Credentials
+-- stay out of the database by design.
+-- ---------------------------------------------------------------------------
+
+alter table public.clients
+  add column meta_business text
+    check (meta_business is null or meta_business ~ '^[a-z0-9][a-z0-9_-]{0,30}$');
+
+comment on column public.clients.meta_business is
+  'Key naming which Meta system-user token to use. Null means the default (META_ACCESS_TOKEN); "engage" means META_ACCESS_TOKEN_ENGAGE. Never holds a credential.';
+
+create index clients_meta_business_idx on public.clients (meta_business)
+  where meta_business is not null;

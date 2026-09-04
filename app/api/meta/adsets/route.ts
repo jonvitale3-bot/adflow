@@ -10,13 +10,15 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const campaignId = new URL(request.url).searchParams.get("campaignId");
+  const params = new URL(request.url).searchParams;
+  const campaignId = params.get("campaignId");
+  const business = params.get("business");
   if (!campaignId) {
     return NextResponse.json({ error: "campaignId is required" }, { status: 400 });
   }
 
   try {
-    const adSets = await listAdSets(campaignId);
+    const adSets = await listAdSets(campaignId, business);
     return NextResponse.json({ adSets });
   } catch (err) {
     // Meta rate-limits ad set listing routinely (error 613). Say so plainly

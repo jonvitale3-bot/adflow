@@ -1,6 +1,8 @@
 import "server-only";
 
-import { env, requireEnv } from "@/lib/env";
+import { env } from "@/lib/env";
+
+import { tokenForBusiness } from "./tokens.ts";
 
 import { MetaApiError, toMetaError } from "./errors";
 
@@ -43,9 +45,9 @@ async function parse(res: Response): Promise<unknown> {
 
 async function request<T>(
   input: string,
-  init: RequestInit & { token?: string } = {},
+  init: RequestInit & { business?: string | null } = {},
 ): Promise<T> {
-  const token = init.token ?? requireEnv("META_ACCESS_TOKEN");
+  const token = tokenForBusiness(init.business);
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
 
@@ -61,12 +63,12 @@ async function request<T>(
  * campaigns or ad sets at all, so long-tail accounts silently showed a
  * truncated list and ads went to the wrong place.
  */
-async function paginate<T>(first: string): Promise<T[]> {
+async function paginate<T>(first: string, business?: string | null): Promise<T[]> {
   const out: T[] = [];
   let next: string | undefined = first;
 
   for (let page = 0; page < MAX_PAGES && next; page++) {
-    const body: Paged<T> = await request<Paged<T>>(next);
+    const body: Paged<T> = await request<Paged<T>>(next, { business });
     if (body.data?.length) out.push(...body.data);
     next = body.paging?.next;
   }
@@ -86,12 +88,13 @@ export interface AdAccount {
   business?: { name?: string };
 }
 
-export function listAdAccounts(): Promise<AdAccount[]> {
+export function listAdAccounts(business?: string | null): Promise<AdAccount[]> {
   return paginate<AdAccount>(
     url("me/adaccounts", {
       fields: "id,account_id,name,account_status,business{name}",
       limit: String(PAGE_SIZE),
     }),
+    business,
   );
 }
 
@@ -100,9 +103,10 @@ export interface Page {
   name: string;
 }
 
-export function listPages(): Promise<Page[]> {
+export function listPages(business?: string | null): Promise<Page[]> {
   return paginate<Page>(
     url("me/accounts", { fields: "id,name", limit: String(PAGE_SIZE) }),
+    business,
   );
 }
 
@@ -113,12 +117,13 @@ export interface Campaign {
   objective?: string;
 }
 
-export function listCampaigns(adAccountId: string): Promise<Campaign[]> {
+export function listCampaigns(adAccountId: string, business?: string | null): Promise<Campaign[]> {
   return paginate<Campaign>(
     url(`${adAccountId}/campaigns`, {
       fields: "id,name,status,objective",
       limit: String(PAGE_SIZE),
     }),
+    business,
   );
 }
 
@@ -128,12 +133,13 @@ export interface AdSet {
   status: string;
 }
 
-export function listAdSets(campaignId: string): Promise<AdSet[]> {
+export function listAdSets(campaignId: string, business?: string | null): Promise<AdSet[]> {
   return paginate<AdSet>(
     url(`${campaignId}/adsets`, {
       fields: "id,name,status",
       limit: String(PAGE_SIZE),
     }),
+    business,
   );
 }
 
@@ -154,6 +160,7 @@ export interface InstagramAccount {
 export async function listInstagramAccounts(
   adAccountId: string,
   pageId?: string,
+  business?: string | null,
 ): Promise<InstagramAccount[]> {
   const acct = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
 
@@ -161,6 +168,7 @@ export async function listInstagramAccounts(
     () =>
       paginate<InstagramAccount>(
         url(`${acct}/instagram_accounts`, { fields: "id,username", limit: "100" }),
+        business,
       ),
   ];
 
@@ -168,12 +176,13 @@ export async function listInstagramAccounts(
     sources.push(() =>
       paginate<InstagramAccount>(
         url(`${pageId}/instagram_accounts`, { fields: "id,username", limit: "100" }),
+        business,
       ),
     );
     sources.push(async () => {
       const body = await request<{
         instagram_business_account?: InstagramAccount;
-      }>(url(pageId, { fields: "instagram_business_account{id,username}" }));
+      }>(url(pageId, { fields: "instagram_business_account{id,username}" }), { business });
       return body.instagram_business_account ? [body.instagram_business_account] : [];
     });
   }
@@ -205,6 +214,7 @@ export async function listInstagramAccounts(
 export async function uploadAdImage(
   adAccountId: string,
   imageUrl: string,
+  business?: string | null,
 ): Promise<string> {
   const src = await fetch(imageUrl, { cache: "no-store" });
   if (!src.ok) {
@@ -229,7 +239,7 @@ export async function uploadAdImage(
 
   const body = await request<{ images?: Record<string, { hash?: string }> }>(
     url(`${adAccountId}/adimages`),
-    { method: "POST", body: form },
+    { method: "POST", body: form, business },
   );
 
   // The response is keyed by an unpredictable filename, not a fixed field.
@@ -257,6 +267,7 @@ export interface CreateCreativeInput {
   link: string;
   imageHash: string;
   urlTags: string;
+  business?: string | null;
 }
 
 export async function createAdCreative(input: CreateCreativeInput): Promise<string> {
@@ -290,6 +301,7 @@ export async function createAdCreative(input: CreateCreativeInput): Promise<stri
   const body = await request<{ id: string }>(url(`${input.adAccountId}/adcreatives`), {
     method: "POST",
     body: form,
+    business: input.business,
   });
 
   return body.id;
@@ -301,6 +313,7 @@ export interface CreateAdInput {
   creativeId: string;
   name: string;
   pixelId?: string;
+  business?: string | null;
 }
 
 /** Always PAUSED. This tool never activates an ad. docs/SPEC.md §9 rule 10. */
@@ -324,6 +337,7 @@ export async function createAd(input: CreateAdInput): Promise<string> {
   const body = await request<{ id: string }>(url(`${input.adAccountId}/ads`), {
     method: "POST",
     body: form,
+    business: input.business,
   });
 
   return body.id;
@@ -334,8 +348,8 @@ export async function createAd(input: CreateAdInput): Promise<string> {
  * rejecting must remove the draft from the client's account, not just mark a
  * row. The old build had no equivalent.
  */
-export async function deleteAd(adId: string): Promise<void> {
-  await request<{ success?: boolean }>(url(adId), { method: "DELETE" });
+export async function deleteAd(adId: string, business?: string | null): Promise<void> {
+  await request<{ success?: boolean }>(url(adId), { method: "DELETE", business });
 }
 
 // ---------------------------------------------------------------------------

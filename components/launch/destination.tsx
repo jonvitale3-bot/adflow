@@ -27,11 +27,15 @@ export interface Destination {
 export function DestinationPicker({
   adAccountId,
   pageId,
+  business,
+  clientName,
   value,
   onChange,
 }: {
   adAccountId: string | null;
   pageId: string | null;
+  business: string | null;
+  clientName: string;
   value: Destination;
   onChange: (next: Destination) => void;
 }) {
@@ -40,20 +44,23 @@ export function DestinationPicker({
   const [instagram, setInstagram] = useState<Array<{ id: string; username?: string }>>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
   const loadCampaigns = useCallback(async () => {
     if (!adAccountId) return;
     setLoading("campaigns");
     setError(null);
     try {
-      const res = await fetch(`/api/meta/campaigns?adAccountId=${encodeURIComponent(adAccountId)}`);
+      const params = new URLSearchParams({ adAccountId });
+      if (business) params.set("business", business);
+      const res = await fetch(`/api/meta/campaigns?${params}`);
       const body = await res.json();
       if (!res.ok) setError(body.error);
       else setCampaigns(body.campaigns);
     } finally {
       setLoading(null);
     }
-  }, [adAccountId]);
+  }, [adAccountId, business]);
 
   useEffect(() => {
     setCampaigns([]);
@@ -65,11 +72,12 @@ export function DestinationPicker({
     if (!adAccountId) return;
     const params = new URLSearchParams({ adAccountId });
     if (pageId) params.set("pageId", pageId);
+    if (business) params.set("business", business);
     void fetch(`/api/meta/instagram?${params}`)
       .then((r) => r.json())
       .then((b) => setInstagram(b.accounts ?? []))
       .catch(() => setInstagram([]));
-  }, [adAccountId, pageId]);
+  }, [adAccountId, pageId, business]);
 
   const loadAdSets = useCallback(
     async (campaignId: string) => {
@@ -80,7 +88,9 @@ export function DestinationPicker({
       setLoading("adsets");
       setError(null);
       try {
-        const res = await fetch(`/api/meta/adsets?campaignId=${encodeURIComponent(campaignId)}`);
+        const params = new URLSearchParams({ campaignId });
+      if (business) params.set("business", business);
+      const res = await fetch(`/api/meta/adsets?${params}`);
         const body = await res.json();
         if (!res.ok) setError(body.error);
         else setAdSets(body.adSets);
@@ -88,7 +98,7 @@ export function DestinationPicker({
         setLoading(null);
       }
     },
-    [],
+    [business],
   );
 
   useEffect(() => {
@@ -112,6 +122,25 @@ export function DestinationPicker({
         </div>
       )}
 
+      {campaigns.length > 8 && (
+        <div>
+          <label className="mb-1.5 block text-[12px] font-[550] text-text-secondary" htmlFor="campaign-filter">
+            Find a campaign
+          </label>
+          <input
+            id="campaign-filter"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={`Try "${clientName.split(/\s+[-–—]\s+/)[0]}"`}
+            className="h-[34px] w-full rounded-md border border-border-strong bg-surface px-2.5 text-[13px] outline-none placeholder:text-text-tertiary focus:border-accent focus:focus-ring"
+          />
+          <p className="mt-1.5 text-[12px] text-text-tertiary">
+            This ad account holds {campaigns.length} campaigns, and may serve several
+            clients. Campaign names usually carry the client name.
+          </p>
+        </div>
+      )}
+
       <Select
         label="Campaign"
         value={value.campaignId}
@@ -122,12 +151,14 @@ export function DestinationPicker({
         <option value="">
           {loading === "campaigns" ? "Loading…" : "Choose a campaign…"}
         </option>
-        {campaigns.map((c) => (
+        {campaigns
+          .filter((c) => !filter.trim() || c.name.toLowerCase().includes(filter.trim().toLowerCase()))
+          .map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
             {c.status && c.status !== "ACTIVE" ? ` · ${c.status.toLowerCase()}` : ""}
-          </option>
-        ))}
+            </option>
+          ))}
       </Select>
 
       <Select

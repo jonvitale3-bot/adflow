@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, meta_ad_account_id")
+    .select("id, name, meta_ad_account_id, meta_business")
     .eq("id", parsed.data.clientId)
     .single();
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     const settled = await Promise.all(
       batch.map(async (creative) => {
         try {
-          const hash = await uploadAdImage(client.meta_ad_account_id!, creative.image_url);
+          const hash = await uploadAdImage(client.meta_ad_account_id!, creative.image_url, client.meta_business);
           await supabase
             .from("creatives")
             .update({ meta_image_hash: hash })

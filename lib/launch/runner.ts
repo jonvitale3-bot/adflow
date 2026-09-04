@@ -41,6 +41,7 @@ interface ClientContext {
   meta_pixel_id: string | null;
   instagram_account_id: string | null;
   landing_page_url: string | null;
+  meta_business: string | null;
   timezone?: string | null;
 }
 
@@ -93,7 +94,11 @@ async function pushOne(
   // repeated pushes stop re-uploading the same image.
   let imageHash = creative.meta_image_hash;
   if (!imageHash) {
-    imageHash = await uploadAdImage(client.meta_ad_account_id, creative.image_url);
+    imageHash = await uploadAdImage(
+      client.meta_ad_account_id,
+      creative.image_url,
+      client.meta_business,
+    );
     await db.from("creatives").update({ meta_image_hash: imageHash }).eq("id", creative.id);
   }
 
@@ -117,6 +122,7 @@ async function pushOne(
       link,
       imageHash,
       urlTags,
+      business: client.meta_business,
     });
   } catch (err) {
     // Supplying an Instagram actor fails when the Page has no linked IG
@@ -131,6 +137,7 @@ async function pushOne(
         link,
         imageHash,
         urlTags,
+        business: client.meta_business,
       });
     } else {
       throw err;
@@ -143,6 +150,7 @@ async function pushOne(
     creativeId: metaCreativeId,
     name: buildAdName(client.name, variation.headline, client.timezone ?? "America/New_York"),
     pixelId: client.meta_pixel_id ?? undefined,
+    business: client.meta_business,
   });
 
   await db
@@ -157,7 +165,7 @@ async function pushOne(
     .eq("id", variationId);
 }
 
-async function rejectOne(db: Db, variationId: string): Promise<void> {
+async function rejectOne(db: Db, variationId: string, business: string | null): Promise<void> {
   const { data: variation } = await db
     .from("ad_variations")
     .select("id, meta_ad_id")
@@ -168,7 +176,7 @@ async function rejectOne(db: Db, variationId: string): Promise<void> {
 
   // Already gone from Meta; just settle the row.
   if (variation.meta_ad_id) {
-    await deleteAd(variation.meta_ad_id);
+    await deleteAd(variation.meta_ad_id, business);
   }
 
   await db
@@ -193,7 +201,7 @@ export async function runJobSlice(db: Db, jobId: string): Promise<RunResult> {
   const { data: client } = await db
     .from("clients")
     .select(
-      "id, name, meta_ad_account_id, meta_page_id, meta_pixel_id, instagram_account_id, landing_page_url",
+      "id, name, meta_ad_account_id, meta_page_id, meta_pixel_id, instagram_account_id, landing_page_url, meta_business",
     )
     .eq("id", job.client_id)
     .single();
@@ -217,7 +225,7 @@ export async function runJobSlice(db: Db, jobId: string): Promise<RunResult> {
           if (job.kind === "push") {
             await pushOne(db, client as ClientContext, job.meta_adset_id!, item.variation_id);
           } else {
-            await rejectOne(db, item.variation_id);
+            await rejectOne(db, item.variation_id, (client as ClientContext).meta_business);
           }
           await db
             .from("job_items")

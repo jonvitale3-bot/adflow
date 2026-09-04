@@ -6,11 +6,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
-interface MetaCheck {
+interface BusinessResult {
+  key: string;
+  label: string;
+  envName: string;
   ok: boolean;
   error?: string;
   adAccounts?: Array<{ id: string; name: string; business: string | null; active: boolean }>;
-  pages?: Array<{ id: string; name: string }>;
+  pageCount?: number;
+}
+
+interface MetaCheck {
+  ok: boolean;
+  error?: string;
+  businesses?: BusinessResult[];
 }
 
 const CREDENTIALS = [
@@ -113,6 +122,14 @@ export function SettingsView({
             To change one: Vercel → Project → Settings → Environment Variables, then
             redeploy. Vercel does not pick up a new value until the next deploy.
           </p>
+
+          <p className="mt-2 rounded-md border border-border bg-background px-3 py-2 text-[12px] leading-[1.45] text-text-secondary">
+            <strong className="font-[550]">A second Meta business portfolio</strong> needs its
+            own system-user token — one token cannot see across Business Managers. Add it as{" "}
+            <code className="font-mono text-[11px]">META_ACCESS_TOKEN_&lt;NAME&gt;</code> (for
+            example <code className="font-mono text-[11px]">META_ACCESS_TOKEN_ENGAGE</code>),
+            redeploy, then set each client&rsquo;s portfolio on its record. No code change needed.
+          </p>
         </section>
 
         <section className="mt-6 rounded-lg border border-border bg-surface p-5 shadow-raised">
@@ -120,7 +137,7 @@ export function SettingsView({
             <div>
               <h2 className="text-[15px] font-semibold">Meta connection</h2>
               <p className="mt-0.5 text-[13px] text-text-secondary">
-                Check what the token can actually see. Graph {graphVersion}.
+                Check what each business portfolio&rsquo;s token can see. Graph {graphVersion}.
               </p>
             </div>
             <Button onClick={testMeta} disabled={testing || !configured.meta}>
@@ -134,31 +151,42 @@ export function SettingsView({
             </p>
           )}
 
-          {check?.ok && (
-            <div className="mt-4">
-              <p className="text-[12px] text-success-on-subtle">
-                ● Connected — {check.adAccounts?.length ?? 0} ad accounts,{" "}
-                {check.pages?.length ?? 0} Pages visible.
-              </p>
+          {check?.businesses?.map((b) => (
+            <div key={b.key} className="mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-[550]">{b.label}</span>
+                <code className="font-mono text-[11px] text-text-tertiary">{b.envName}</code>
+              </div>
 
-              {check.adAccounts && check.adAccounts.length > 0 && (
-                <ul className="mt-3 max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border">
-                  {check.adAccounts.map((a) => (
-                    <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px]">{a.name}</p>
-                        <p className="font-mono text-[11px] text-text-tertiary">
-                          {a.id}
-                          {a.business ? ` · ${a.business}` : ""}
-                        </p>
-                      </div>
-                      {!a.active && <Badge tone="warning" glyph="▲">Inactive</Badge>}
-                    </li>
-                  ))}
-                </ul>
+              {b.ok ? (
+                <>
+                  <p className="mt-1 text-[12px] text-success-on-subtle">
+                    ● {b.adAccounts?.length ?? 0} ad accounts, {b.pageCount ?? 0} Pages visible.
+                  </p>
+                  {b.adAccounts && b.adAccounts.length > 0 && (
+                    <ul className="mt-2 max-h-56 divide-y divide-border overflow-y-auto rounded-md border border-border">
+                      {b.adAccounts.map((a) => (
+                        <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px]">{a.name}</p>
+                            <p className="font-mono text-[11px] text-text-tertiary">
+                              {a.id}
+                              {a.business ? ` · ${a.business}` : ""}
+                            </p>
+                          </div>
+                          {!a.active && <Badge tone="warning" glyph="▲">Inactive</Badge>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className="mt-1 rounded-md border border-danger-border bg-danger-subtle px-3 py-2 text-[12px] leading-[1.45] text-danger-on-subtle">
+                  ! {b.error}
+                </p>
               )}
             </div>
-          )}
+          ))}
         </section>
 
         <section className="mt-6 rounded-lg border border-border bg-surface p-5 shadow-raised">

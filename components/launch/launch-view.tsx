@@ -21,6 +21,7 @@ interface ClientRecord {
   meta_ad_account_id: string | null;
   meta_page_id: string | null;
   landing_page_url: string | null;
+  meta_business: string | null;
   location_description: string | null;
   market_name: string | null;
   season_type: string;
@@ -267,6 +268,8 @@ export function LaunchView({
               <DestinationPicker
                 adAccountId={client?.meta_ad_account_id ?? null}
                 pageId={client?.meta_page_id ?? null}
+                business={client?.meta_business ?? null}
+                clientName={client?.name ?? ""}
                 value={destination}
                 onChange={setDestination}
               />

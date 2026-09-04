@@ -72,6 +72,7 @@ export const ClientFormSchema = z
     industry: z.enum(INDUSTRIES),
     marine_business_type: z.enum(MARINE_BUSINESS_TYPES).optional().or(z.literal("")),
     special_ad_category: z.enum(SPECIAL_AD_CATEGORIES).default("none"),
+    meta_business: z.string().trim().default(""),
     location_description: z.string().trim().default(""),
     meta_page_id: numericId("Facebook Page ID").default(""),
     meta_ad_account_id: adAccountId.default(""),
