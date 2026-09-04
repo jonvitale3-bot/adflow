@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Select } from "@/components/ui/field";
 
 interface Option {
@@ -44,7 +45,6 @@ export function DestinationPicker({
   const [instagram, setInstagram] = useState<Array<{ id: string; username?: string }>>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
 
   const loadCampaigns = useCallback(async () => {
     if (!adAccountId) return;
@@ -122,62 +122,51 @@ export function DestinationPicker({
         </div>
       )}
 
-      {campaigns.length > 8 && (
-        <div>
-          <label className="mb-1.5 block text-[12px] font-[550] text-text-secondary" htmlFor="campaign-filter">
-            Find a campaign
-          </label>
-          <input
-            id="campaign-filter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder={`Try "${clientName.split(/\s+[-–—]\s+/)[0]}"`}
-            className="h-[34px] w-full rounded-md border border-border-strong bg-surface px-2.5 text-[13px] outline-none placeholder:text-text-tertiary focus:border-accent focus:focus-ring"
-          />
-          <p className="mt-1.5 text-[12px] text-text-tertiary">
-            This ad account holds {campaigns.length} campaigns, and may serve several
-            clients. Campaign names usually carry the client name.
-          </p>
-        </div>
-      )}
-
-      <Select
+      <Combobox
         label="Campaign"
         value={value.campaignId}
-        disabled={loading === "campaigns"}
-        hint={loading === "campaigns" ? "Loading campaigns…" : undefined}
-        onChange={(e) => onChange({ ...value, campaignId: e.target.value, adSetId: "" })}
-      >
-        <option value="">
-          {loading === "campaigns" ? "Loading…" : "Choose a campaign…"}
-        </option>
-        {campaigns
-          .filter((c) => !filter.trim() || c.name.toLowerCase().includes(filter.trim().toLowerCase()))
-          .map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-            {c.status && c.status !== "ACTIVE" ? ` · ${c.status.toLowerCase()}` : ""}
-            </option>
-          ))}
-      </Select>
+        loading={loading === "campaigns"}
+        options={campaigns.map((c) => ({
+          id: c.id,
+          name: c.name,
+          note: c.status && c.status !== "ACTIVE" ? c.status.toLowerCase() : undefined,
+          deemphasised: Boolean(c.status && c.status !== "ACTIVE"),
+        }))}
+        // One ad account can serve several clients, and campaign names carry
+        // the client name, so the search opens already narrowed to this one.
+        suggestedQuery={clientName.split(/\s+[-–—]\s+/)[0]}
+        placeholder={campaigns.length ? "Choose a campaign…" : "No campaigns found"}
+        hint={
+          campaigns.length > 12
+            ? `${campaigns.length} campaigns in this ad account — type to filter.`
+            : undefined
+        }
+        emptyMessage="No campaign matches that search"
+        onChange={(id) => onChange({ ...value, campaignId: id, adSetId: "" })}
+      />
 
-      <Select
+      <Combobox
         label="Ad set"
         value={value.adSetId}
-        disabled={!value.campaignId || loading === "adsets"}
-        hint={loading === "adsets" ? "Loading ad sets…" : "Ads are created here, paused."}
-        onChange={(e) => onChange({ ...value, adSetId: e.target.value })}
-      >
-        <option value="">
-          {loading === "adsets" ? "Loading…" : "Choose an ad set…"}
-        </option>
-        {adSets.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-            {a.status && a.status !== "ACTIVE" ? ` · ${a.status.toLowerCase()}` : ""}
-          </option>
-        ))}
-      </Select>
+        disabled={!value.campaignId}
+        loading={loading === "adsets"}
+        options={adSets.map((a) => ({
+          id: a.id,
+          name: a.name,
+          note: a.status && a.status !== "ACTIVE" ? a.status.toLowerCase() : undefined,
+          deemphasised: Boolean(a.status && a.status !== "ACTIVE"),
+        }))}
+        placeholder={
+          !value.campaignId
+            ? "Choose a campaign first"
+            : adSets.length
+              ? "Choose an ad set…"
+              : "No ad sets in this campaign"
+        }
+        hint="Ads are created here, paused."
+        emptyMessage="No ad set matches that search"
+        onChange={(id) => onChange({ ...value, adSetId: id })}
+      />
 
       <Select
         label="Instagram account"
