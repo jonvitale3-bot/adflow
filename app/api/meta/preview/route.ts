@@ -114,7 +114,9 @@ export async function POST(request: Request) {
   };
   // Instagram placements render as the linked IG account when there is one.
   if (client.instagram_account_id) {
-    storySpec.instagram_actor_id = client.instagram_account_id;
+    // The current field. Its predecessor, instagram_actor_id, wants a legacy
+    // actor id rather than the account id Business Settings shows.
+    storySpec.instagram_user_id = client.instagram_account_id;
   }
 
   try {

@@ -159,8 +159,19 @@ async function pushOne(
   // per-placement spec the account will not take. Neither is worth failing a
   // launch over when a plainer creative would have gone through, so the ad
   // lands and the review grid says what was given up.
-  const igVariants = client.instagram_account_id
-    ? [client.instagram_account_id, undefined]
+  // Both spellings of the identity, then none.
+  //
+  // Which field an account works in depends on how it was connected, and
+  // getting it wrong reports as an invalid id rather than a wrong field, so
+  // the only reliable way to find out is to try.
+  const igVariants: Array<
+    { id: string; field: "instagram_user_id" | "instagram_actor_id" } | undefined
+  > = client.instagram_account_id
+    ? [
+        { id: client.instagram_account_id, field: "instagram_user_id" },
+        { id: client.instagram_account_id, field: "instagram_actor_id" },
+        undefined,
+      ]
     : [undefined];
   const specVariants = assetFeedSpec ? [assetFeedSpec, null] : [null];
 
@@ -183,14 +194,15 @@ async function pushOne(
   // identity. Retrying only the creative meant the first accepted creative
   // ended the ladder, and the ad failed with nothing left to fall back to.
   outer: for (const spec of specVariants) {
-    for (const instagramAccountId of igVariants) {
+    for (const ig of igVariants) {
       const label = `${spec ? "per-placement" : "one image"}, ${
-        instagramAccountId ? "with Instagram" : "no Instagram"
+        ig ? ig.field : "no Instagram"
       }`;
       try {
         const creativeId = await createAdCreative({
           ...base,
-          instagramAccountId,
+          instagramAccountId: ig?.id,
+          instagramField: ig?.field,
           assetFeedSpec: spec,
         });
 

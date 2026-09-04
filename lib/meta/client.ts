@@ -434,6 +434,17 @@ export interface CreateCreativeInput {
   adAccountId: string;
   pageId: string;
   instagramAccountId?: string;
+  /**
+   * Which field carries the Instagram identity.
+   *
+   * Meta has two, and they take different kinds of id. instagram_actor_id is
+   * the older one and wants a legacy actor id; instagram_user_id is its
+   * replacement and takes the Instagram account id Business Settings shows,
+   * the one beginning 17841. Handing the second kind to the first field fails
+   * with "(#100) Param instagram_actor_id must be a valid Instagram account
+   * id", which reads like a permissions problem and is not one.
+   */
+  instagramField?: "instagram_user_id" | "instagram_actor_id";
   name: string;
   message: string;
   headline: string;
@@ -472,7 +483,7 @@ export async function createAdCreative(input: CreateCreativeInput): Promise<stri
       };
 
   if (input.instagramAccountId) {
-    spec.instagram_actor_id = input.instagramAccountId;
+    spec[input.instagramField ?? "instagram_user_id"] = input.instagramAccountId;
   }
 
   // Both of these alter the pixels Meta serves: one reframes the image per
