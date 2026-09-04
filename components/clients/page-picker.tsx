@@ -21,11 +21,13 @@ interface Page {
 export function PagePicker({
   value,
   business,
+  adAccountId,
   error,
   onChange,
 }: {
   value: string;
   business: string | null;
+  adAccountId: string | null;
   error?: string;
   onChange: (id: string) => void;
 }) {
@@ -40,6 +42,7 @@ export function PagePicker({
     try {
       const params = new URLSearchParams();
       if (business) params.set("business", business);
+      if (adAccountId) params.set("adAccountId", adAccountId);
       const res = await fetch(`/api/meta/pages?${params}`);
       const body = await res.json();
       if (!res.ok) {
@@ -53,7 +56,7 @@ export function PagePicker({
     } finally {
       setLoading(false);
     }
-  }, [business]);
+  }, [business, adAccountId]);
 
   useEffect(() => {
     void load();
@@ -74,7 +77,7 @@ export function PagePicker({
           loadError
             ? loadError
             : pages.length === 0
-              ? "No Pages are visible to this portfolio's token. Assign Pages to the system user in Business Settings, or paste an id."
+              ? "No Pages are available for this ad account. Assign Pages to the system user in Business Settings, or paste an id."
               : "This id is not among the Pages the token can see."
         }
       >

@@ -17,10 +17,12 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const business = new URL(request.url).searchParams.get("business");
+  const params = new URL(request.url).searchParams;
+  const business = params.get("business");
+  const adAccountId = params.get("adAccountId");
 
   try {
-    const pages = await listPages(business);
+    const pages = await listPages(business, adAccountId);
     return NextResponse.json({
       pages: pages
         .map((p) => ({ id: p.id, name: p.name }))

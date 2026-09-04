@@ -435,6 +435,7 @@ export function ClientPanel({
             <PagePicker
               value={values.meta_page_id ?? ""}
               business={values.meta_business || null}
+              adAccountId={values.meta_ad_account_id || null}
               error={errors.meta_page_id}
               onChange={(id) => set("meta_page_id", id)}
             />

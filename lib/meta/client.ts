@@ -103,9 +103,25 @@ export interface Page {
   name: string;
 }
 
-export function listPages(business?: string | null): Promise<Page[]> {
+/**
+ * Pages the token can create ads as.
+ *
+ * `/me/accounts` returns Pages the user holds a role on, which is a narrower
+ * and subtly different set — a Page can be assigned to a system user for
+ * advertising without appearing there, and several were. `promote_pages` is
+ * scoped to exactly the question that matters: can this token run an ad as
+ * this Page. Falls back to /me/accounts when no ad account is given.
+ */
+export function listPages(
+  business?: string | null,
+  adAccountId?: string | null,
+): Promise<Page[]> {
+  const path = adAccountId
+    ? `${adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`}/promote_pages`
+    : "me/accounts";
+
   return paginate<Page>(
-    url("me/accounts", { fields: "id,name", limit: String(PAGE_SIZE) }),
+    url(path, { fields: "id,name", limit: String(PAGE_SIZE) }),
     business,
   );
 }
