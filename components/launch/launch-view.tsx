@@ -316,6 +316,33 @@ export function LaunchView({
     }
   }
 
+  async function fixDashes(ids: string[]) {
+    if (ids.length === 0) return;
+    setBusy("dashes");
+    setMessage(null);
+    try {
+      const res = await fetch("/api/copy/fix-dashes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ clientId, variationIds: ids }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setMessage({ tone: "error", text: body.error ?? "Could not rewrite those" });
+        return;
+      }
+      await refresh();
+      setMessage({
+        tone: "ok",
+        text: body.fellBack
+          ? `Rewrote ${body.fixed}. ${body.fellBack} could not be rewritten and had the dashes swapped for commas; read those before launching.`
+          : `Rewrote ${body.fixed} ad${body.fixed === 1 ? "" : "s"} without dashes.`,
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function refresh() {
     const { data } = await createClient()
       .from("ad_variations")
@@ -474,6 +501,7 @@ export function LaunchView({
                 industry={client?.industry ?? ""}
           onRefresh={refresh}
           onDiscard={discard}
+          onFixDashes={fixDashes}
                 onPair={pairNow}
               />
             )}

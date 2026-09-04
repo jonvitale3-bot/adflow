@@ -6,6 +6,7 @@ import { PreviewDialog } from "@/components/launch/preview-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { hasDash } from "@/lib/generation/dashes";
 import { validateBoatClubVariation, validateVariation } from "@/lib/generation/validate";
 
 export interface Variation {
@@ -39,6 +40,7 @@ export function ReviewGrid({
   onReject,
   onRefresh,
   onDiscard,
+  onFixDashes,
   onPair,
 }: {
   variations: Variation[];
@@ -51,6 +53,7 @@ export function ReviewGrid({
   onReject: (ids: string[]) => void;
   onRefresh: () => void;
   onDiscard: (ids: string[]) => void;
+  onFixDashes: (ids: string[]) => void;
   onPair?: () => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -76,6 +79,12 @@ export function ReviewGrid({
       return next;
     });
   }
+
+  // House rule: no dashes in ad copy. Generated copy rarely has them now, but
+  // imported copy arrives however it was written.
+  const dashed = shown.filter(
+    (v) => v.status === "draft" && (hasDash(v.headline) || hasDash(v.primary_text)),
+  );
 
   const selectedIds = [...selected].filter((id) => shown.some((v) => v.id === id));
   const targetIds = selectedIds.length > 0 ? selectedIds : shown.map((v) => v.id);
@@ -159,6 +168,22 @@ export function ReviewGrid({
         <p className="border-b border-border bg-warning-subtle px-5 py-2 text-[12px] text-warning-on-subtle">
           ▲ Choose an ad set before launching.
         </p>
+      )}
+
+      {dashed.length > 0 && reviewingDrafts && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-warning-subtle px-5 py-2">
+          <p className="text-[12px] text-warning-on-subtle">
+            ▲ {dashed.length} {dashed.length === 1 ? "ad uses" : "ads use"} a dash. Rewriting
+            keeps every claim and only changes the punctuation around it.
+          </p>
+          <Button
+            size="row"
+            disabled={busy !== null}
+            onClick={() => onFixDashes(dashed.map((v) => v.id))}
+          >
+            {busy === "dashes" ? "Rewriting…" : "Rewrite without dashes"}
+          </Button>
+        </div>
       )}
 
       {unpaired.length > 0 && reviewingDrafts && (
