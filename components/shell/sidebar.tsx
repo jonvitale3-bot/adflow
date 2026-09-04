@@ -100,7 +100,9 @@ export function Sidebar({
     <nav
       aria-label="Main"
       style={{ width: collapsed ? 52 : 220 }}
-      className="flex shrink-0 flex-col border-r border-border bg-background px-2.5 py-3 transition-[width] duration-200 ease-out"
+      // Pinned to the viewport: navigation that scrolls away is navigation you
+      // have to scroll back for, and these screens are long.
+      className="sticky top-0 flex h-dvh shrink-0 flex-col overflow-y-auto border-r border-border bg-background px-2.5 py-3 transition-[width] duration-200 ease-out"
     >
       <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
         <div className="flex items-center gap-2">

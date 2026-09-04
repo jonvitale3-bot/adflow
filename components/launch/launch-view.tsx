@@ -76,9 +76,33 @@ export function LaunchView({
       instagramId: saved?.instagram_account_id ?? "",
     });
     if (saved?.default_batch_size) setCount(saved.default_batch_size);
+    setMessage(null);
+
+    // Ads are written to the database the moment they are generated, so
+    // switching clients never loses a batch. Without this they were still
+    // there and simply not shown, which reads exactly like losing them.
+    let current = true;
     setVariations([]);
     setStage("setup");
-    setMessage(null);
+
+    void createClient()
+      .from("ad_variations")
+      .select(
+        "id, headline, primary_text, angle, status, meta_ad_id, error, push_note, creatives(image_url)",
+      )
+      .eq("client_id", clientId)
+      .in("status", ["draft", "pushing", "pushed", "kept", "failed"])
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        // The client may have changed again while this was in flight.
+        if (!current || !data?.length) return;
+        setVariations(data as unknown as Variation[]);
+        setStage("review");
+      });
+
+    return () => {
+      current = false;
+    };
   }, [clientId, defaults]);
 
   useEffect(() => {
@@ -267,10 +291,37 @@ export function LaunchView({
     }
   }
 
+  async function discard(ids: string[]) {
+    if (ids.length === 0) return;
+    setBusy("discard");
+    setMessage(null);
+    try {
+      const res = await fetch("/api/launch/discard", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ clientId, variationIds: ids }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setMessage({ tone: "error", text: body.error ?? "Could not discard those" });
+        return;
+      }
+      await refresh();
+      setMessage({
+        tone: "ok",
+        text: `Discarded ${body.discarded} ad${body.discarded === 1 ? "" : "s"}.`,
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function refresh() {
     const { data } = await createClient()
       .from("ad_variations")
-      .select("id, headline, primary_text, angle, status, meta_ad_id, error, creatives(image_url)")
+      .select(
+        "id, headline, primary_text, angle, status, meta_ad_id, error, push_note, creatives(image_url)",
+      )
       .eq("client_id", clientId)
       .in("status", ["draft", "pushing", "pushed", "kept", "failed"])
       .order("created_at", { ascending: false });
@@ -316,7 +367,10 @@ export function LaunchView({
         )}
 
         <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-          <aside className="rounded-lg border border-border bg-surface p-5 shadow-raised">
+          {/* Stays put while the review grid scrolls — the client, the
+              destination and Generate are all in here, and reviewing forty ads
+              should not mean scrolling back to reach them. */}
+          <aside className="rounded-lg border border-border bg-surface p-5 shadow-raised lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto">
             <h2 className="text-[15px] font-semibold">Set up</h2>
             <p className="mt-0.5 mb-4 text-[13px] text-text-secondary">
               Destination is remembered per client.
@@ -418,6 +472,7 @@ export function LaunchView({
                 onPush={(ids) => runJob("push", ids)}
                 onReject={(ids) => runJob("reject", ids)}
                 onRefresh={refresh}
+          onDiscard={discard}
                 onPair={pairNow}
               />
             )}

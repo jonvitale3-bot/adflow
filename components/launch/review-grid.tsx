@@ -36,6 +36,7 @@ export function ReviewGrid({
   onPush,
   onReject,
   onRefresh,
+  onDiscard,
   onPair,
 }: {
   variations: Variation[];
@@ -46,6 +47,7 @@ export function ReviewGrid({
   onPush: (ids: string[]) => void;
   onReject: (ids: string[]) => void;
   onRefresh: () => void;
+  onDiscard: (ids: string[]) => void;
   onPair?: () => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -94,15 +96,34 @@ export function ReviewGrid({
             </Button>
           )}
           {reviewingDrafts ? (
-            <Button
-              variant="primary"
-              disabled={!canPush || busy !== null}
-              onClick={() => onPush(targetIds)}
-            >
-              {busy === "push"
-                ? "Creating…"
-                : `Launch ${targetIds.length} as paused drafts`}
-            </Button>
+            <>
+              {/* A draft has never reached Meta, so throwing one away is a
+                  local delete — nothing to undo in the ad account. */}
+              <Button
+                variant="danger"
+                disabled={busy !== null}
+                onClick={() => {
+                  const what =
+                    selectedIds.length > 0
+                      ? `${selectedIds.length} selected ad${selectedIds.length === 1 ? "" : "s"}`
+                      : `all ${shown.length} ads`;
+                  if (confirm(`Discard ${what}? They have not been sent to Meta, so this only removes them here.`)) {
+                    onDiscard(targetIds);
+                  }
+                }}
+              >
+                {busy === "discard" ? "Discarding…" : `Discard ${targetIds.length}`}
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!canPush || busy !== null}
+                onClick={() => onPush(targetIds)}
+              >
+                {busy === "push"
+                  ? "Creating…"
+                  : `Launch ${targetIds.length} as paused drafts`}
+              </Button>
+            </>
           ) : (
             <>
               <Button onClick={onRefresh} disabled={busy !== null}>Refresh</Button>

@@ -33,7 +33,7 @@ interface Creative {
   width: number | null;
   height: number | null;
   /** Extra aspect-ratio renditions, each delivered to its own placements. */
-  creative_assets: Array<{ id: string; ratio: Ratio; image_url: string }>;
+  creative_assets: Array<{ id: string; ratio: Ratio; image_url: string; derived: boolean }>;
 }
 
 export function CreativesView({ clients }: { clients: ClientOption[] }) {
@@ -44,6 +44,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
   const [label, setLabel] = useState("");
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null);
+  const [filling, setFilling] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -59,7 +60,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     const { data } = await supabase
       .from("creatives")
       .select(
-        "id, image_url, label, meta_image_hash, archived, source, has_baked_text, width, height, creative_assets(id, ratio, image_url)",
+        "id, image_url, label, meta_image_hash, archived, source, has_baked_text, width, height, creative_assets(id, ratio, image_url, derived)",
       )
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
@@ -74,6 +75,16 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
   const visible = creatives.filter((c) => (showArchived ? c.archived : !c.archived));
   const archivedCount = creatives.filter((c) => c.archived).length;
   const unsynced = creatives.filter((c) => !c.archived && !c.meta_image_hash);
+
+  // Active creatives with nothing to serve a story or reel with. They still
+  // launch — Meta fits the square into the frame — but a fitted square is a
+  // letterboxed ad, and this is the one-click fix.
+  const missingVertical = creatives.filter(
+    (c) =>
+      !c.archived &&
+      ratioOf(c.width ?? 1, c.height ?? 1) !== "vertical" &&
+      !c.creative_assets.some((a) => a.ratio === "vertical"),
+  ).length;
 
   async function upload(files: FileList | File[]) {
     if (!clientId) return;
@@ -202,6 +213,41 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     }
   }
 
+  /**
+   * Builds the sizes a creative is missing, for creatives nobody has a
+   * designed vertical for.
+   */
+  async function fillSizes(creativeId?: string) {
+    if (!clientId) return;
+    setFilling(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/creatives/fill-sizes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ clientId, creativeId, ratios: ["vertical"] }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setMessage({ tone: "error", text: body.error ?? "Could not build the missing sizes" });
+        return;
+      }
+      setMessage(
+        body.built > 0
+          ? {
+              tone: "ok",
+              text: `Built ${body.built} vertical version${body.built === 1 ? "" : "s"}. Check them in the ad preview before launching.`,
+            }
+          : { tone: "ok", text: "Nothing was missing a vertical." },
+      );
+      void load();
+    } catch {
+      setMessage({ tone: "error", text: "Could not build the missing sizes" });
+    } finally {
+      setFilling(false);
+    }
+  }
+
   async function setArchived(id: string, archived: boolean) {
     await createClient().from("creatives").update({ archived }).eq("id", id);
     void load();
@@ -289,6 +335,15 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
             )}
 
             <div className="ml-auto flex items-center gap-2">
+              {missingVertical > 0 && (
+                <Button
+                  onClick={() => void fillSizes()}
+                  disabled={filling}
+                  title="Places each square whole on a 9:16 canvas over a blurred fill of itself. Nothing is cropped, so a designed image keeps its headline and badge."
+                >
+                  {filling ? "Building…" : `Build ${missingVertical} vertical`}
+                </Button>
+              )}
               {unsynced.length > 0 && (
                 <Button onClick={syncToMeta} disabled={syncing || !client?.meta_ad_account_id}>
                   {syncing ? "Uploading…" : `Sync ${unsynced.length} to Meta`}
@@ -497,22 +552,32 @@ function RatioRow({
   // columns and are square, which every creative in the library then was.
   const primary =
     creative.width && creative.height ? ratioOf(creative.width, creative.height) : "square";
+
   const have = new Set<Ratio>([primary, ...creative.creative_assets.map((a) => a.ratio)]);
+  const derived = new Set<Ratio>(
+    creative.creative_assets.filter((a) => a.derived).map((a) => a.ratio),
+  );
 
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1">
       {RATIOS.map((ratio) => (
         <span
           key={ratio}
-          title={RATIO_HINTS[ratio]}
+          title={
+            derived.has(ratio)
+              ? `${RATIO_HINTS[ratio]} — built from the square, not designed for this shape`
+              : RATIO_HINTS[ratio]
+          }
           className={cn(
             "rounded-sm px-1.5 py-0.5 text-[10px] font-[550]",
-            have.has(ratio)
-              ? "bg-success-subtle text-success-on-subtle"
-              : "bg-surface-muted text-text-tertiary",
+            !have.has(ratio)
+              ? "bg-surface-muted text-text-tertiary"
+              : derived.has(ratio)
+                ? "bg-warning-subtle text-warning-on-subtle"
+                : "bg-success-subtle text-success-on-subtle",
           )}
         >
-          {have.has(ratio) ? "●" : "○"} {RATIO_LABELS[ratio]}
+          {!have.has(ratio) ? "○" : derived.has(ratio) ? "◐" : "●"} {RATIO_LABELS[ratio]}
         </span>
       ))}
 
