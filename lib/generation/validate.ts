@@ -40,6 +40,58 @@ const BANNED_FILLER = [
   "life's better on the water",
 ];
 
+/**
+ * Social proof that cannot be checked.
+ *
+ * The line is not "numbers are banned", it is whether a reader could verify
+ * the claim. A count of people is a number only the advertiser knows, and an
+ * invented one is a liability in paid advertising. A rating or a review count
+ * points at a public page anyone can open, and this client's own designed
+ * creative carries "4.7 from 157 Google reviews" on the image, so copy that
+ * says the same thing is not the problem.
+ *
+ * Written in parts because the failure of the rule this replaces was that it
+ * only matched a digit sitting directly against a noun: it flagged "157
+ * reviews" while allowing "hundreds of members", which the brand rules ban by
+ * name.
+ */
+const QUANTITY = String.raw`(?:\d[\d,]*\+?|hundreds|thousands|millions|dozens|scores|countless)`;
+const PEOPLE = String.raw`(?:members?|clients?|customers?|families|boaters?|patients?|homeowners?|subscribers?|students?|people)`;
+const CHOOSING = String.raw`(?:choose|chose|choosing|joins?|joined|joining|trusts?|trusted|switch(?:ed)?|signed up)`;
+
+// "500 members", "hundreds of members", "2,000+ happy customers".
+const PEOPLE_CLAIM = new RegExp(String.raw`\b${QUANTITY}\s+(?:of\s+)?(?:\w+\s+){0,2}${PEOPLE}\b`, "i");
+// "thousands choose us", "hundreds have already joined".
+const CHOOSING_CLAIM = new RegExp(String.raw`\b${QUANTITY}\s+(?:\w+\s+){0,2}${CHOOSING}\b`, "i");
+
+/**
+ * What makes a count checkable is that it says where to check.
+ *
+ * "157 boaters" is a claim; "157 boaters on Google" is a citation. So the test
+ * runs a sentence at a time, and a sentence that names its source keeps its
+ * number.
+ */
+const SOURCED = /\b(google|yelp|facebook|trustpilot|bbb|angi|tripadvisor|reviews?|rated|rating|stars?)\b/i;
+
+function claimsUnverifiableProof(text: string): boolean {
+  return text
+    .split(/(?<=[.!?\n])\s+/)
+    .some((sentence) => {
+      if (SOURCED.test(sentence)) return false;
+      return PEOPLE_CLAIM.test(sentence) || CHOOSING_CLAIM.test(sentence);
+    });
+}
+
+/**
+ * Boat clubs go further: no membership counts at all, true or not. That is a
+ * brand decision rather than a claims one, so it lives with the other
+ * boat-club rules instead of applying to every client.
+ */
+const CLUB_COUNT = new RegExp(
+  String.raw`\b${QUANTITY}\s+(?:\w+\s+){0,2}(?:members?|memberships?)\b`,
+  "i",
+);
+
 const COST_COMPARISON = [
   "cheaper than owning",
   "fraction of the cost",
@@ -110,10 +162,11 @@ export function validateVariation(v: Checkable): CopyWarning[] {
     }
   }
 
-  if (/\b\d[\d,]*\+?\s*(members|clients|customers|reviews|families)\b/.test(lower)) {
+  if (claimsUnverifiableProof(v.primary_text)) {
     warnings.push({
-      rule: "numeric_social_proof",
-      detail: "Uses a numeric social-proof claim; qualitative only.",
+      rule: "invented_social_proof",
+      detail:
+        "Claims a number of people (\"hundreds of members\", \"2,000+ customers\"). Nobody can check it, so keep social proof qualitative.",
     });
   }
 
@@ -157,6 +210,14 @@ export function validateBoatClubVariation(v: Checkable): CopyWarning[] {
         detail: `Compares cost to ownership ("${phrase}"); value is framed as access and simplicity.`,
       });
     }
+  }
+
+  if (CLUB_COUNT.test(lower)) {
+    warnings.push({
+      rule: "membership_count",
+      detail:
+        "Names a membership number. Clubs vary too much location to location for one to mean anything; keep social proof qualitative.",
+    });
   }
 
   return warnings;

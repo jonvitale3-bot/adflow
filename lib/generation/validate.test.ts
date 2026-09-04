@@ -59,10 +59,6 @@ test("naming a month is flagged — ads outlive the month", () => {
   assert.ok(rules(validateVariation(bad)).includes("month_named"));
 });
 
-test("numeric social proof is flagged", () => {
-  const bad = v({ primary_text: "Over 500 members boat weekly.\n👇 Join today" });
-  assert.ok(rules(validateVariation(bad)).includes("numeric_social_proof"));
-});
 
 test("qualitative social proof is NOT flagged", () => {
   const ok = v({
@@ -108,4 +104,60 @@ test("a dash is flagged wherever it appears", () => {
 test("an ordinary hyphen is not a dash", () => {
   const fine = v({ primary_text: "Full-service marina, dry-stack racks.\n👇 Reserve a rack" });
   assert.ok(!rules(validateVariation(fine)).includes("dash"));
+});
+
+// The rule this replaces matched a digit sitting directly against a noun, so
+// it flagged a real review count and allowed every phrase the brand rules ban
+// by name. These cases are taken from those rules.
+test("an unverifiable count of people is flagged", () => {
+  for (const text of [
+    "Hundreds of members near you.",
+    "Thousands choose us every season.",
+    "500 members nearby made the switch.",
+    "Join 2,000+ happy customers.",
+    "Thousands of families boat with us.",
+    "Dozens of local homeowners booked this month.",
+  ]) {
+    assert.ok(
+      rules(validateVariation(v({ primary_text: text }))).includes("invented_social_proof"),
+      `missed: ${text}`,
+    );
+  }
+});
+
+test("a review count points at a page anyone can open, so it stands", () => {
+  for (const text of [
+    "4.7 from 157 Google reviews.",
+    "157 reviews, and they keep landing on the same three things.",
+    "Rated 4.7 by 157 boaters on Google.",
+  ]) {
+    assert.ok(
+      !rules(validateVariation(v({ primary_text: text }))).includes("invented_social_proof"),
+      `wrongly flagged: ${text}`,
+    );
+  }
+});
+
+test("counting things is not counting people", () => {
+  for (const text of [
+    "300 dry stack spaces and 60 wet slips.",
+    "600 feet of floating dock, minutes from the Gulf.",
+    "Four marinas, one membership across all of them.",
+  ]) {
+    assert.deepEqual(rules(validateVariation(v({ primary_text: text }))), []);
+  }
+});
+
+test("a boat club may not name a membership number, true or not", () => {
+  const strict = validateBoatClubVariation(v({ primary_text: "Over 400 members boat with us." }));
+  assert.ok(rules(strict).includes("membership_count"));
+
+  // The same copy is only the generic claims problem for anyone else.
+  const generic = validateVariation(v({ primary_text: "Over 400 members boat with us." }));
+  assert.ok(!rules(generic).includes("membership_count"));
+});
+
+test("a marina citing its Google rating is not a boat club membership claim", () => {
+  const w = validateBoatClubVariation(v({ primary_text: "4.7 from 157 Google reviews." }));
+  assert.deepEqual(rules(w), []);
 });
