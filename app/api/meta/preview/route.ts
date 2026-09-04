@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { mayReframe } from "@/lib/creatives/placement";
 import { generatePreview, MetaApiError, type AdFormat } from "@/lib/meta/client";
 import { parsePreviewFrame } from "@/lib/meta/preview";
 import { appendUrlTags, buildUrlTags } from "@/lib/meta/utm";
@@ -40,7 +41,9 @@ export async function POST(request: Request) {
 
   const { data: variation } = await supabase
     .from("ad_variations")
-    .select("id, headline, primary_text, client_id, creatives(image_url, meta_image_hash)")
+    .select(
+      "id, headline, primary_text, client_id, creatives(image_url, meta_image_hash, has_baked_text)",
+    )
     .eq("id", parsed.data.variationId)
     .single();
 
@@ -48,7 +51,9 @@ export async function POST(request: Request) {
 
   const { data: client } = await supabase
     .from("clients")
-    .select("name, meta_ad_account_id, meta_page_id, landing_page_url, meta_business")
+    .select(
+      "name, meta_ad_account_id, meta_page_id, instagram_account_id, landing_page_url, meta_business",
+    )
     .eq("id", variation.client_id)
     .single();
 
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
   }
 
   const creative = variation.creatives as unknown as
-    | { image_url: string; meta_image_hash: string | null }
+    | { image_url: string; meta_image_hash: string | null; has_baked_text: boolean | null }
     | null;
 
   const urlTags = buildUrlTags(client.name, variation.headline);
@@ -78,10 +83,33 @@ export async function POST(request: Request) {
   if (creative?.meta_image_hash) linkData.image_hash = creative.meta_image_hash;
   else if (creative?.image_url) linkData.picture = creative.image_url;
 
+  const storySpec: Record<string, unknown> = {
+    page_id: client.meta_page_id,
+    link_data: linkData,
+  };
+  // Instagram placements render as the linked IG account when there is one.
+  if (client.instagram_account_id) {
+    storySpec.instagram_actor_id = client.instagram_account_id;
+  }
+
   try {
     const body = await generatePreview(
       client.meta_ad_account_id,
-      { page_id: client.meta_page_id, link_data: linkData },
+      {
+        // The endpoint takes a whole ad creative, not a story spec. Passing the
+        // story spec bare makes Meta render "Ad Incomplete", because from its
+        // side the creative has no object_story_spec at all.
+        object_story_spec: storySpec,
+        // Mirrors the push, so the preview shows the reframing the ad will
+        // actually get rather than a version Meta is free to recrop.
+        degrees_of_freedom_spec: {
+          creative_features_spec: {
+            adapt_to_placement: {
+              enroll_status: mayReframe(creative?.has_baked_text) ? "OPT_IN" : "OPT_OUT",
+            },
+          },
+        },
+      },
       parsed.data.format as AdFormat,
       client.meta_business,
     );

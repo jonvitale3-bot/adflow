@@ -27,6 +27,8 @@ interface Creative {
   meta_image_hash: string | null;
   archived: boolean;
   source: string;
+  /** NULL until examined. Non-false blocks Meta placement cropping. */
+  has_baked_text: boolean | null;
 }
 
 export function CreativesView({ clients }: { clients: ClientOption[] }) {
@@ -50,7 +52,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     const supabase = createClient();
     const { data } = await supabase
       .from("creatives")
-      .select("id, image_url, label, meta_image_hash, archived, source")
+      .select("id, image_url, label, meta_image_hash, archived, source, has_baked_text")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
     setCreatives((data ?? []) as Creative[]);
@@ -111,6 +113,21 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
       setMessage({ tone: "ok", text: `Uploaded ${list.length} image${list.length === 1 ? "" : "s"}.` });
     }
     void load();
+
+    // Look at what was just uploaded: one pass records what each image depicts,
+    // so copy can be written to it, and whether it carries its own headline or
+    // offer badge, which decides whether Meta may crop it for a placement. Not
+    // awaited — it is slow, and nothing on this screen waits on it.
+    void fetch("/api/creatives/describe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ clientId }),
+    })
+      .then(() => load())
+      .catch(() => {
+        // The launch flow runs the same pass before generating copy, so a
+        // failure here costs nothing but a later wait.
+      });
   }
 
   async function setArchived(id: string, archived: boolean) {
@@ -314,11 +331,18 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
                         loading="lazy"
                         className="h-full w-full object-cover"
                       />
-                      <span className="absolute top-2 left-2">
+                      <span className="absolute top-2 left-2 flex flex-col items-start gap-1">
                         {creative.meta_image_hash ? (
                           <Badge tone="success" glyph="●">On Meta</Badge>
                         ) : (
                           <Badge tone="warning" glyph="▲">Not uploaded</Badge>
+                        )}
+                        {/* Says why this image will run un-cropped: Meta's
+                            placement reframing would cut the copy off it. */}
+                        {creative.has_baked_text && (
+                          <span title="This image has copy designed into it, so Meta is not allowed to crop it for other placements. It runs as authored.">
+                            <Badge tone="accent">Text in image</Badge>
+                          </span>
                         )}
                       </span>
                     </div>

@@ -284,6 +284,12 @@ export interface CreateCreativeInput {
   imageHash: string;
   urlTags: string;
   business?: string | null;
+  /**
+   * Whether Meta may reframe this image for each placement. False whenever the
+   * image carries designed-in copy — cropping a square to 9:16 takes the
+   * corner an offer badge sits in, and the ad runs with half a price on it.
+   */
+  adaptToPlacement: boolean;
 }
 
 export async function createAdCreative(input: CreateCreativeInput): Promise<string> {
@@ -302,14 +308,20 @@ export async function createAdCreative(input: CreateCreativeInput): Promise<stri
     spec.instagram_actor_id = input.instagramAccountId;
   }
 
+  // Both of these alter the pixels Meta serves: one reframes the image per
+  // placement, the other animates it. Neither is safe over designed-in copy,
+  // so an image carrying its own headline opts out of both and is delivered
+  // as authored — fitted to the placement rather than cropped into it.
+  const enroll = input.adaptToPlacement ? "OPT_IN" : "OPT_OUT";
+
   const form = new URLSearchParams({
     name: input.name,
     object_story_spec: JSON.stringify(spec),
     url_tags: input.urlTags,
     degrees_of_freedom_spec: JSON.stringify({
       creative_features_spec: {
-        adapt_to_placement: { enroll_status: "OPT_IN" },
-        media_liquidity_animated_image: { enroll_status: "OPT_IN" },
+        adapt_to_placement: { enroll_status: enroll },
+        media_liquidity_animated_image: { enroll_status: enroll },
       },
     }),
   });

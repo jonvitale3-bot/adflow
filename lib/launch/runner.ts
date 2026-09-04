@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { mayReframe } from "@/lib/creatives/placement";
 import {
   createAd,
   createAdCreative,
@@ -73,7 +74,9 @@ async function pushOne(
 ): Promise<void> {
   const { data: variation } = await db
     .from("ad_variations")
-    .select("id, headline, primary_text, meta_ad_id, creative_id, creatives(id, image_url, meta_image_hash)")
+    .select(
+      "id, headline, primary_text, meta_ad_id, creative_id, creatives(id, image_url, meta_image_hash, has_baked_text)",
+    )
     .eq("id", variationId)
     .single();
 
@@ -82,9 +85,7 @@ async function pushOne(
   // Idempotency: an item retried after a timeout must not create a second ad.
   if (variation.meta_ad_id) return;
 
-  let creative = variation.creatives as unknown as
-    | { id: string; image_url: string; meta_image_hash: string | null }
-    | null;
+  let creative = variation.creatives as unknown as PairedCreative | null;
 
   // Pair late when the variation has no creative yet.
   //
@@ -115,6 +116,8 @@ async function pushOne(
     await db.from("creatives").update({ meta_image_hash: imageHash }).eq("id", creative.id);
   }
 
+  const adaptToPlacement = mayReframe(creative.has_baked_text);
+
   const urlTags = buildUrlTags(client.name, variation.headline);
   const link = appendUrlTags(client.landing_page_url ?? "", urlTags);
   if (!client.landing_page_url) {
@@ -135,6 +138,7 @@ async function pushOne(
       link,
       imageHash,
       urlTags,
+      adaptToPlacement,
       business: client.meta_business,
     });
   } catch (err) {
@@ -150,6 +154,7 @@ async function pushOne(
         link,
         imageHash,
         urlTags,
+        adaptToPlacement,
         business: client.meta_business,
       });
     } else {
@@ -182,14 +187,23 @@ async function pushOne(
  * Assigns a creative to a variation that has none, spreading choices across the
  * library rather than putting the same image on every late-paired ad.
  */
+/** What the push needs to know about the image an ad will run with. */
+interface PairedCreative {
+  id: string;
+  image_url: string;
+  meta_image_hash: string | null;
+  /** NULL until the vision pass has looked; treated as true. */
+  has_baked_text: boolean | null;
+}
+
 async function pairLate(
   db: Db,
   clientId: string,
   variationId: string,
-): Promise<{ id: string; image_url: string; meta_image_hash: string | null } | null> {
+): Promise<PairedCreative | null> {
   const { data: creatives } = await db
     .from("creatives")
-    .select("id, image_url, meta_image_hash, created_at")
+    .select("id, image_url, meta_image_hash, has_baked_text, created_at")
     .eq("client_id", clientId)
     .eq("archived", false)
     .order("created_at", { ascending: true })
@@ -221,6 +235,7 @@ async function pairLate(
     id: chosen.id,
     image_url: chosen.image_url,
     meta_image_hash: chosen.meta_image_hash,
+    has_baked_text: chosen.has_baked_text,
   };
 }
 

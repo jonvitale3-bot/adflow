@@ -507,3 +507,27 @@ comment on column public.clients.match_copy_to_image is
 
 create index creatives_undescribed_idx on public.creatives (client_id)
   where description is null and not archived;
+
+-- ---------------------------------------------------------------------------
+-- Placement safety.
+--
+-- Meta's `adapt_to_placement` reframes one image for every placement, which is
+-- what lets a single square launch everywhere. It is also destructive when the
+-- image has designed-in copy: cropping a square to 9:16 takes the corner the
+-- offer badge sits in, and the ad runs with half a price on it.
+--
+-- So the vision pass that already looks at each upload now also reports whether
+-- copy is baked in, and the push only lets Meta reframe images known to be
+-- clean photographs. NULL means "not looked at yet" and is treated as unsafe —
+-- an un-cropped ad is a worse ad, a mis-cropped one is a broken ad.
+-- ---------------------------------------------------------------------------
+
+alter table public.creatives
+  add column has_baked_text boolean;
+
+comment on column public.creatives.has_baked_text is
+  'True when a headline, badge, logo or other chrome is part of the image. Blocks Meta placement auto-cropping, which would cut it. NULL means not yet examined and is treated as true.';
+
+-- Generated images are photographs by construction: the image prompt forbids
+-- text, logos, buttons and colour bars outright, so they are safe to reframe.
+update public.creatives set has_baked_text = false where source = 'ai';

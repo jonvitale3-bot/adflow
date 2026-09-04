@@ -122,6 +122,10 @@ export async function POST(request: Request) {
               source: "ai",
               scene: sceneChoice.id || null,
               rendered_prompt: image.prompt,
+              // The image prompt forbids text, logos, buttons and colour bars
+              // outright, so a generated image is a clean photograph and Meta
+              // may reframe it per placement without cutting anything.
+              has_baked_text: false,
             })
             .select("id")
             .single();
