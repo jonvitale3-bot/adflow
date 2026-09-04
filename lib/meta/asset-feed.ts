@@ -1,4 +1,4 @@
-import { DEFAULT_RATIO, PLACEMENTS, type Ratio } from "../creatives/ratios.ts";
+import { DEFAULT_RATIO, PLACEMENTS, RATIOS, type Ratio } from "../creatives/ratios.ts";
 
 /**
  * Placement asset customization.
@@ -59,12 +59,30 @@ export function buildAssetFeedSpec(
     adlabels: [{ name: labelFor(ratio) }],
   }));
 
-  const rules = [...byRatio].map(([ratio]) => ({
-    customization_spec: PLACEMENTS[ratio],
-    image_label: { name: labelFor(ratio) },
-    // Anything not named by a rule renders with the square.
-    ...(ratio === DEFAULT_RATIO ? { is_default: true } : {}),
-  }));
+  // Order is priority: the first rule that claims a placement wins, and the
+  // last rule is the fallback. Meta requires that fallback to exist and to
+  // carry an EMPTY customization_spec — a rule that names placements and also
+  // marks itself default is rejected with "Default Asset Customization Rule
+  // (with lowest priority) with empty customization_spec is required".
+  //
+  // So the square is not given placements of its own. It is the default, which
+  // is the same statement made the way Meta wants it heard: every placement no
+  // other rule claimed renders with the square.
+  const rules: Array<Record<string, unknown>> = [];
+
+  for (const ratio of RATIOS) {
+    if (ratio === DEFAULT_RATIO || !byRatio.has(ratio)) continue;
+    rules.push({
+      customization_spec: PLACEMENTS[ratio],
+      image_label: { name: labelFor(ratio) },
+    });
+  }
+
+  rules.push({
+    customization_spec: {},
+    image_label: { name: labelFor(DEFAULT_RATIO) },
+    is_default: true,
+  });
 
   return {
     ad_formats: ["SINGLE_IMAGE"],
