@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/skeleton";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { industryLabel } from "@/lib/clients/grouping";
@@ -66,6 +67,8 @@ export function ClientPanel({
   const [aiFields, setAiFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [autofilling, setAutofilling] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -109,6 +112,57 @@ export function ClientPanel({
       const { [String(key)]: _, ...rest } = e;
       return rest;
     });
+  }
+
+  async function autofill() {
+    if (!values.name.trim()) {
+      setErrors((e) => ({ ...e, name: "Add a client name first" }));
+      return;
+    }
+    setAutofilling(true);
+    setFormError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/clients/autofill", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          locationDescription: values.location_description,
+          industry: values.industry,
+          marineBusinessType: values.marine_business_type || undefined,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setFormError(body.error ?? "Auto-fill failed");
+        return;
+      }
+
+      // Only fill what is empty — never overwrite something already typed.
+      const filled = new Set<string>();
+      setValues((current) => {
+        const next = { ...current };
+        for (const [key, value] of Object.entries(body.values as Record<string, string>)) {
+          if (!value) continue;
+          const k = key as keyof ClientFormValues;
+          if (String(current[k] ?? "").trim() === "") {
+            (next[k] as unknown) = value;
+            filled.add(key);
+          }
+        }
+        return next;
+      });
+      setAiFields(filled);
+      setNotice(
+        body.warning ??
+          (filled.size > 0
+            ? `Filled ${filled.size} empty field${filled.size === 1 ? "" : "s"}. Check them before saving.`
+            : "Nothing to fill — every field already has a value."),
+      );
+    } finally {
+      setAutofilling(false);
+    }
   }
 
   async function save() {
@@ -186,6 +240,30 @@ export function ClientPanel({
               {formError}
             </p>
           )}
+
+          {notice && (
+            <p
+              role="status"
+              className="mb-4 rounded-md border border-accent-subtle-border bg-accent-subtle px-3 py-2 text-[12px] leading-[1.45] text-text-secondary"
+            >
+              {notice}
+            </p>
+          )}
+
+          <div className="mb-5 flex items-center gap-3 rounded-lg border border-accent-subtle-border bg-accent-subtle p-3">
+            <p className="min-w-0 flex-1 text-[12px] leading-[1.45] text-text-secondary">
+              {autofilling
+                ? "Reading the business name and location — filling market, environment and voice fields."
+                : "Fill market, environment and voice fields from the client's name and location."}
+            </p>
+            {autofilling ? (
+              <Spinner />
+            ) : (
+              <Button variant="primary" className="shrink-0" onClick={autofill}>
+                Auto-fill with AI
+              </Button>
+            )}
+          </div>
 
           <SectionHeading>Classification</SectionHeading>
           <div className="flex flex-col gap-3.5">
