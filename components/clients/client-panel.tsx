@@ -170,7 +170,8 @@ export function ClientPanel({
           name: values.name,
           locationDescription: values.location_description,
           industry: values.industry,
-          marineBusinessType: (values.marine_business_types ?? [])[0] || undefined,
+          marineBusinessTypes: values.marine_business_types ?? [],
+          landingPageUrl: values.landing_page_url || undefined,
         }),
       });
       const body = await res.json();
@@ -195,10 +196,14 @@ export function ClientPanel({
       });
       setAiFields(filled);
       setNotice(
-        body.warning ??
-          (filled.size > 0
-            ? `Filled ${filled.size} empty field${filled.size === 1 ? "" : "s"}. Check them before saving.`
-            : "Nothing to fill — every field already has a value."),
+        [
+          body.notice,
+          filled.size > 0
+            ? `Filled ${filled.size} empty field${filled.size === 1 ? "" : "s"} — check them before saving.`
+            : "Nothing to fill; every field already has a value.",
+        ]
+          .filter(Boolean)
+          .join(" "),
       );
     } finally {
       setAutofilling(false);
@@ -297,8 +302,12 @@ export function ClientPanel({
           <div className="mb-5 flex items-center gap-3 rounded-lg border border-accent-subtle-border bg-accent-subtle p-3">
             <p className="min-w-0 flex-1 text-[12px] leading-[1.45] text-text-secondary">
               {autofilling
-                ? "Reading the business name and location — filling market, environment and voice fields."
-                : "Fill market, environment and voice fields from the client's name and location."}
+                ? values.landing_page_url
+                  ? "Reading the landing page — filling location, services, offer, voice and the pixel."
+                  : "Working from the name and location — filling market, environment and voice."
+                : values.landing_page_url
+                  ? "Read the landing page to fill location, services, offer, voice and the Meta pixel."
+                  : "Fill market, environment and voice from the name. Add a landing page URL first for much better results."}
             </p>
             {autofilling ? (
               <Spinner />
