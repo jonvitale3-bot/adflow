@@ -165,26 +165,49 @@ async function pushOne(
   const specVariants = assetFeedSpec ? [assetFeedSpec, null] : [null];
 
   let metaCreativeId: string | null = null;
+  let adId: string | null = null;
   let pushNote: string | null = run.perPlacementRejected
     ? `Launched with one image for every placement. Meta rejected the per-placement version earlier in this launch: ${run.perPlacementRejected}`
     : null;
   let lastError: unknown = null;
 
   // Every rung of the ladder is recorded, because reporting only the last one
-  // makes four different rejections look like a single unexplained failure.
+  // makes several different rejections look like a single unexplained failure.
   const tried: string[] = [];
 
+  // The rung is creative AND ad, not creative alone.
+  //
+  // Meta validates the two separately and will accept a creative it then
+  // refuses to build an ad from: a per-placement spec is fine on its own, but
+  // an ad set that targets Instagram will not take one without an Instagram
+  // identity. Retrying only the creative meant the first accepted creative
+  // ended the ladder, and the ad failed with nothing left to fall back to.
   outer: for (const spec of specVariants) {
     for (const instagramAccountId of igVariants) {
       const label = `${spec ? "per-placement" : "one image"}, ${
         instagramAccountId ? "with Instagram" : "no Instagram"
       }`;
       try {
-        metaCreativeId = await createAdCreative({
+        const creativeId = await createAdCreative({
           ...base,
           instagramAccountId,
           assetFeedSpec: spec,
         });
+
+        adId = await createAd({
+          adAccountId: client.meta_ad_account_id,
+          adSetId,
+          creativeId,
+          name: buildAdName(
+            client.name,
+            variation.headline,
+            client.timezone ?? "America/New_York",
+          ),
+          pixelId: client.meta_pixel_id ?? undefined,
+          business: client.meta_business,
+        });
+
+        metaCreativeId = creativeId;
         if (assetFeedSpec && !spec) {
           const reason = lastError instanceof Error ? lastError.message : "unknown error";
           // Remembered for the rest of the run, so the remaining ads go
@@ -201,21 +224,9 @@ async function pushOne(
     }
   }
 
-  if (!metaCreativeId) {
+  if (!metaCreativeId || !adId) {
     throw new Error(`No creative was accepted. Tried: ${tried.join("  ·  ")}`);
   }
-
-  // Labelled separately from the creative attempts. The two fail for different
-  // reasons and need different fixes, and an unlabelled message here reads as
-  // though the creative was the problem when it was accepted.
-  const adId = await createAdOrExplain({
-    adAccountId: client.meta_ad_account_id,
-    adSetId,
-    creativeId: metaCreativeId,
-    name: buildAdName(client.name, variation.headline, client.timezone ?? "America/New_York"),
-    pixelId: client.meta_pixel_id ?? undefined,
-    business: client.meta_business,
-  });
 
   await db
     .from("ad_variations")
@@ -292,16 +303,6 @@ async function syncRatioAssets(
 function ratioOfCreative(creative: PairedCreative): Ratio {
   if (!creative.width || !creative.height) return "square";
   return ratioOf(creative.width, creative.height);
-}
-
-/** Creates the ad, saying so when it is the ad rather than the creative. */
-async function createAdOrExplain(input: Parameters<typeof createAd>[0]): Promise<string> {
-  try {
-    return await createAd(input);
-  } catch (err) {
-    if (!(err instanceof MetaApiError)) throw err;
-    throw new Error(`The creative was accepted but the ad was rejected: ${err.message}`);
-  }
 }
 
 /**
