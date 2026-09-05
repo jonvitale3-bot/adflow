@@ -68,15 +68,15 @@ export function ReviewGrid({
   const pushed = variations.filter((v) => v.status === "pushed");
   const failed = variations.filter((v) => v.status === "failed");
 
-  // What is still to launch: a draft, or an attempt that did not reach Meta.
-  // A failed ad has no ad in the account, so it belongs with the drafts rather
-  // than with the ads that got through, and relaunching retries it.
+  // Everything, always.
   //
-  // The grid used to filter failures out entirely — first whenever drafts
-  // remained, then whenever any did — so "2 failed" in the header pointed at
-  // nothing on screen and the reason was unreachable.
+  // This grid has hidden the card that mattered twice now: failures while
+  // drafts remained, then ads that pushed while drafts remained. Both times a
+  // count in the header pointed at something not on screen, and the second
+  // time it made a fallback look like a success. Whatever is on the screen
+  // should be everything there is; status is what the cards are for.
   const pending = variations.filter((v) => v.status === "draft" || v.status === "failed");
-  const shown = pending.length > 0 ? pending : pushed.length > 0 ? pushed : variations;
+  const shown = [...pending, ...pushed];
   const unpaired = shown.filter((v) => !v.creatives?.image_url);
   const reviewingDrafts = pending.length > 0;
 
@@ -99,6 +99,13 @@ export function ReviewGrid({
   const selectedIds = [...selected].filter((id) => shown.some((v) => v.id === id));
   const targetIds = selectedIds.length > 0 ? selectedIds : shown.map((v) => v.id);
 
+  // Launching and discarding only ever apply to what has not reached Meta.
+  // Now that pushed ads are listed alongside drafts, "all of them" has to mean
+  // all of the ones those buttons can act on.
+  const launchable = targetIds.filter((id) =>
+    pending.some((v) => v.id === id),
+  );
+
   // Rejecting removes an ad from the account, so it only applies to ads that
   // reached it. A failed variation has nothing in Meta to remove.
   const rejectable = targetIds.filter((id) =>
@@ -116,7 +123,7 @@ export function ReviewGrid({
         </span>
 
         {pushedCount > 0 && reviewingDrafts && (
-          <Badge tone="accent">{pushedCount} already in Meta</Badge>
+          <Badge tone="accent">{pushedCount} already in Meta, below</Badge>
         )}
         {failed.length > 0 && (
           <Badge tone="danger" glyph="!">
@@ -136,27 +143,27 @@ export function ReviewGrid({
                   local delete — nothing to undo in the ad account. */}
               <Button
                 variant="danger"
-                disabled={busy !== null}
+                disabled={busy !== null || launchable.length === 0}
                 onClick={() => {
                   const what =
                     selectedIds.length > 0
-                      ? `${selectedIds.length} selected ad${selectedIds.length === 1 ? "" : "s"}`
-                      : `all ${shown.length} ads`;
+                      ? `${launchable.length} selected ad${launchable.length === 1 ? "" : "s"}`
+                      : `all ${launchable.length} ads`;
                   if (confirm(`Discard ${what}? They have not been sent to Meta, so this only removes them here.`)) {
-                    onDiscard(targetIds);
+                    onDiscard(launchable);
                   }
                 }}
               >
-                {busy === "discard" ? "Discarding…" : `Discard ${targetIds.length}`}
+                {busy === "discard" ? "Discarding…" : `Discard ${launchable.length}`}
               </Button>
               <Button
                 variant="primary"
-                disabled={!canPush || busy !== null}
-                onClick={() => onPush(targetIds)}
+                disabled={!canPush || busy !== null || launchable.length === 0}
+                onClick={() => onPush(launchable)}
               >
                 {busy === "push"
                   ? "Creating…"
-                  : `Launch ${targetIds.length} as paused drafts`}
+                  : `Launch ${launchable.length} as paused drafts`}
               </Button>
             </>
           ) : (

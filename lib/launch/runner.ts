@@ -221,7 +221,17 @@ async function pushOne(
 
         metaCreativeId = creativeId;
         if (assetFeedSpec && !spec) {
-          const reason = lastError instanceof Error ? lastError.message : "unknown error";
+          // Every per-placement attempt, not the last error before this one.
+          //
+          // The rungs are ordered best first, so the last failure is always
+          // the weakest attempt, and reporting it answered a question nobody
+          // asked: it said the version with no Instagram identity was refused
+          // for wanting one, while silently discarding why the version WITH
+          // the identity had failed a moment earlier.
+          const reason =
+            tried.filter((t) => t.startsWith("per-placement")).join("  ·  ") ||
+            (lastError instanceof Error ? lastError.message : "unknown error");
+
           // Remembered for the rest of the run, so the remaining ads go
           // straight to the creative that works.
           run.perPlacementRejected ??= reason;
