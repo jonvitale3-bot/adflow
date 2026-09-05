@@ -380,8 +380,34 @@ Consequences:
    rebuild ever called it. Removed from the environment and the settings
    screen; `sharp` is already a dependency and composites server-side if that
    need ever returns.
-3. **Solo forever, or will the team use it?** There is no role model at all
-   today — auth is binary. Changes how much Phase 2 deserves.
+3. ~~**Solo forever, or will the team use it?**~~ **Answered: one operator now,
+   the agency team later, possibly other agencies after that — but the third
+   is an idea rather than a plan, with no scope attached.**
+
+   So: build nothing for it. Binary auth where every signed-in user sees every
+   client is correct for an agency team, and multi-tenancy built against an
+   unknown scope produces half-isolation, which is worse than none.
+
+   The three walls a SaaS version would hit, recorded so they are not
+   rediscovered under time pressure:
+
+   - **Meta credentials.** Tokens live in environment variables, one per
+     business portfolio, because putting them in a queryable table is the
+     precise defect that made the old build leak everything (§3, SPEC §8). A
+     customer cannot bring their own token that way — there is no Vercel
+     variable per signup. Per-tenant encrypted credential storage reopens the
+     question this design closed, and is the largest piece of the work.
+   - **Row-level security** is `using (true)` for authenticated users on every
+     table. Fine for one team, meaningless between tenants. Adding a tenant
+     column and real policies is mechanical but touches everything.
+   - **The creatives bucket is public-read**, and must stay so while Meta
+     fetches image URLs server-side. Across tenants that exposes one
+     customer's creative to anyone holding the URL. Signed URLs solve it, at
+     the cost of a refresh path on every Meta upload.
+
+   None of this is cheaper to start now, and none of it gets harder by
+   waiting. The only thing that does get harder is backfilling a tenant column
+   across a large dataset, and 33 clients is not that.
 4. **Which master image prompt is the intended one** (§3) — needs your call,
    since the DB row and the code default say opposite things and the DB row is
    what has actually been running.
