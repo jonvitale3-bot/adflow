@@ -373,10 +373,13 @@ Consequences:
 ## 7. Still open
 
 1. **Which Vercel plan?** Sets the function duration ceiling in §1.
-2. **Is Cloudinary earning its place?** It exists to stamp a tagline bar and a
-   promo pill on images. Next.js can composite server-side with `satori` /
-   `sharp`. One less vendor, one less credential, one less thing that forces a
-   fresh Meta image upload on every push.
+2. ~~**Is Cloudinary earning its place?**~~ **Answered: no, and it is gone.**
+   It stamped a tagline bar and a promo pill onto generated photos. The
+   creative that actually runs arrives already designed, with the headline,
+   badge and logo laid out, so there is nothing left to stamp. Nothing in the
+   rebuild ever called it. Removed from the environment and the settings
+   screen; `sharp` is already a dependency and composites server-side if that
+   need ever returns.
 3. **Solo forever, or will the team use it?** There is no role model at all
    today — auth is binary. Changes how much Phase 2 deserves.
 4. **Which master image prompt is the intended one** (§3) — needs your call,

@@ -44,13 +44,6 @@ const CREDENTIALS = [
     detail: "Image generation.",
     needed: "Required to generate images.",
   },
-  {
-    key: "cloudinary" as const,
-    name: "CLOUDINARY_API_SECRET",
-    label: "Cloudinary",
-    detail: "Optional creative overlays. Not currently used by any flow.",
-    needed: "Optional.",
-  },
 ];
 
 export function SettingsView({
@@ -60,7 +53,7 @@ export function SettingsView({
   counts,
 }: {
   email: string;
-  configured: Record<"meta" | "anthropic" | "openai" | "cloudinary", boolean>;
+  configured: Record<"meta" | "anthropic" | "openai", boolean>;
   graphVersion: string;
   counts: { clients: number; creatives: number; variations: number };
 }) {
@@ -110,7 +103,7 @@ export function SettingsView({
                 {configured[cred.key] ? (
                   <Badge tone="success" glyph="●">Set</Badge>
                 ) : (
-                  <Badge tone={cred.key === "cloudinary" ? "neutral" : "warning"} glyph="▲">
+                  <Badge tone="warning" glyph="▲">
                     Not set
                   </Badge>
                 )}

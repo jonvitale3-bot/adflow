@@ -35,10 +35,6 @@ const schema = z.object({
 
   ANTHROPIC_API_KEY: optional(),
   OPENAI_API_KEY: optional(),
-
-  CLOUDINARY_CLOUD_NAME: optional(),
-  CLOUDINARY_API_KEY: optional(),
-  CLOUDINARY_API_SECRET: optional(),
 });
 
 const parsed = schema.safeParse(process.env);

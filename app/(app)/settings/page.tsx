@@ -23,7 +23,6 @@ export default async function SettingsPage() {
         meta: Boolean(env.META_ACCESS_TOKEN),
         anthropic: Boolean(env.ANTHROPIC_API_KEY),
         openai: Boolean(env.OPENAI_API_KEY),
-        cloudinary: Boolean(env.CLOUDINARY_API_SECRET),
       }}
       graphVersion={env.META_GRAPH_VERSION}
       counts={{
