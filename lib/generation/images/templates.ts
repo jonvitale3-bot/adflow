@@ -3,7 +3,8 @@ import {
   ANATOMY_CONSTRAINTS,
   COMPOSITION_CONSTRAINTS,
   JUMPING_CONSTRAINTS,
-  REALISM_CONSTRAINTS,
+  MARINE_REALISM,
+  UNIVERSAL_REALISM,
 } from "./realism.ts";
 
 /**
@@ -27,8 +28,16 @@ export interface ImagePromptInput {
   businessTypeDescription?: string | null;
   toneKeywords?: string | null;
   sceneText?: string | null;
+  /** How this particular shot is framed, so a batch is not one shot six times. */
+  framingText?: string | null;
   headline?: string | null;
   camera?: CameraRegister;
+  /**
+   * Whether chrome will be laid over this image afterwards. Off by default:
+   * the composition rules that reserve space for it are the same rules that
+   * make every image of a batch resemble every other.
+   */
+  reserveOverlaySpace?: boolean;
 }
 
 const NO_CHROME = `CRITICAL: This is a PHOTOGRAPH ONLY. The brand chrome (headline, logo, call-to-action strip, buttons, benefit icons, microcopy) is composited on top of this photo in code afterward. Therefore:
@@ -88,6 +97,14 @@ export function buildImagePrompt(input: ImagePromptInput): string {
     );
   }
 
+  if (input.framingText) {
+    parts.push(
+      "",
+      "HOW THIS SHOT IS FRAMED (the same scene photographed from here, not a wider or safer version of it):",
+      input.framingText,
+    );
+  }
+
   parts.push("", AVOID);
 
   if (input.headline) {
@@ -103,8 +120,10 @@ export function buildImagePrompt(input: ImagePromptInput): string {
 
   prompt += ANATOMY_CONSTRAINTS;
   if (isBoatClub) prompt += JUMPING_CONSTRAINTS;
-  prompt += COMPOSITION_CONSTRAINTS;
-  prompt += REALISM_CONSTRAINTS;
+  if (input.reserveOverlaySpace) prompt += COMPOSITION_CONSTRAINTS;
+  prompt += UNIVERSAL_REALISM;
+  // Wakes, gunwales and swim platforms mean nothing in a basement.
+  if (isBoatClub || input.industry === "marina") prompt += MARINE_REALISM;
 
   return prompt;
 }

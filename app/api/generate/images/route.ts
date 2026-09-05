@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { generateImage, ImageGenerationError, MAX_IMAGES } from "@/lib/generation/images/generate";
+import { deriveScenes } from "@/lib/generation/images/derive-scenes";
+import { selectFramings } from "@/lib/generation/images/framing";
 import { bankFor, selectScenes } from "@/lib/generation/images/scenes";
 import { DEFAULT_CAMERA_REGISTER } from "@/lib/generation/images/camera";
 import { createClient } from "@/lib/supabase/server";
@@ -45,10 +47,31 @@ export async function POST(request: Request) {
 
   if (!client) return Response.json({ error: "Client not found" }, { status: 404 });
 
+  // Hand-tuned scenes where they exist, derived ones where they do not.
+  //
+  // Every client outside boat clubs and marinas fell through to an empty
+  // scene, which meant one prompt repeated `count` times and a batch of
+  // identical images. The client's own description of its work is enough to
+  // brief a photographer from, so it is.
   const bank = bankFor(client.industry, client.marine_business_types);
   const scenes = bank
     ? selectScenes(bank, scene, count)
-    : Array.from({ length: count }, () => ({ id: "", text: "" }));
+    : await deriveScenes({
+        clientName: client.name,
+        businessTypeDescription: client.business_type_description,
+        marketName: client.market_name,
+        locationDescription: client.location_description,
+        toneKeywords: client.tone_keywords,
+        count,
+      });
+
+  // Padded, because a derivation that came back short or empty must not drop
+  // images from a batch someone asked for.
+  while (scenes.length < count) scenes.push({ id: "", text: "" });
+
+  // A different shot of a different moment. Scenes alone still leave every
+  // frame shot from the same distance at the same height.
+  const framings = selectFramings(count);
 
   const encoder = new TextEncoder();
 
@@ -91,6 +114,7 @@ export async function POST(request: Request) {
               businessTypeDescription: client!.business_type_description,
               toneKeywords: client!.tone_keywords,
               sceneText: sceneChoice.text || null,
+              framingText: framings[position]?.text ?? null,
               headline: headline ?? null,
               camera: camera ?? DEFAULT_CAMERA_REGISTER,
               sceneId: sceneChoice.id || null,

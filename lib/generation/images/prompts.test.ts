@@ -79,12 +79,39 @@ test("camera register is swappable for A/B testing", () => {
   assert.doesNotMatch(phone, /35mm lens/);
 });
 
-test("composition keeps overlay space but is no longer Carefree-specific", () => {
-  const p = buildImagePrompt({ ...base, industry: "insurance" });
-  assert.match(p, /UPPER-LEFT quadrant visually calm/);
-  assert.match(p, /BOTTOM ~20%/);
+test("overlay space is reserved only when something will be overlaid", () => {
+  // These rules pin the subject right of centre, keep two areas of the frame
+  // empty and forbid cropping tight. Applied to every image they are a large
+  // part of why a batch came back looking like one photograph repeated.
+  const off = buildImagePrompt({ ...base, industry: "insurance" });
+  assert.doesNotMatch(off, /UPPER-LEFT quadrant visually calm/);
+
+  const on = buildImagePrompt({ ...base, industry: "insurance", reserveOverlaySpace: true });
+  assert.match(on, /UPPER-LEFT quadrant visually calm/);
+  assert.match(on, /BOTTOM ~20%/);
   // The original named a navy CTA strip, which is meaningless for other clients.
-  assert.doesNotMatch(p, /navy/i);
+  assert.doesNotMatch(on, /navy/i);
+});
+
+test("boat rules go to boats, not to everyone", () => {
+  // A water treatment ad was carrying a paragraph about wakes, gunwales, swim
+  // platforms and outboard motors.
+  const plumber = buildImagePrompt({ ...base, industry: "home_services" });
+  assert.doesNotMatch(plumber, /gunwale|swim platform|outboard|wake/i);
+  assert.match(plumber, /STRICT REALISM RULES/);
+
+  const club = buildImagePrompt({ ...base, industry: "boat_club" });
+  assert.match(club, /BOATING REALISM RULES/);
+  assert.match(club, /gunwale/i);
+});
+
+test("the framing for this shot reaches the prompt", () => {
+  const p = buildImagePrompt({
+    ...base,
+    framingText: "Close on the hands and what they are working on.",
+  });
+  assert.match(p, /HOW THIS SHOT IS FRAMED/);
+  assert.match(p, /Close on the hands/);
 });
 
 test("the headline is passed for context and explicitly not rendered", () => {
