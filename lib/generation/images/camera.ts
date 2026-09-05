@@ -13,14 +13,12 @@
 export type CameraRegister = "phone" | "dslr" | "unspecified";
 
 const PHONE = `PHOTOGRAPHIC CHARACTER:
-This must look like a real photo someone actually took on their phone during the moment — not a produced advertisement, not a stock photo, not an AI image.
-- Natural available light only, including imperfect light: harsh midday sun, backlight, overcast flatness, uneven golden hour. No studio lighting, no fill light, no ring light, no obviously even exposure.
-- Handheld framing. Slightly off-centre, horizon not perfectly level, the framing a real person gets when they lift a phone quickly.
-- Deep focus, the way a phone camera renders. Avoid shallow cinematic bokeh and avoid an artificially blurred background.
-- True-to-life colour. No boosted saturation, no heavy grading, no HDR halos, no plastic skin.
-- An ordinary moment rather than a posed hero shot. Nobody making eye contact with the camera. Nobody arranged into a group pose.
-- Real-world texture is welcome: wear, water spots, a towel out of place, wind in hair, a slightly messy deck.
-Do NOT simulate a phone photo with fake artifacts — no added grain, no fake lens flare, no vignette, no visible UI, no timestamp. It should simply BE an ordinary well-taken photo.`;
+A real photo someone actually took on their phone in the moment. Not a produced advertisement, not stock, not an AI image.
+- Available light only, including imperfect light: harsh sun, backlight, overcast flatness, a dim room lit through one window. No studio lighting, no fill, no evenly exposed frame.
+- Handheld. Slightly off-centre, horizon not quite level, the framing a real person gets lifting a phone quickly.
+- Deep focus the way a phone renders. No shallow cinematic bokeh, no artificially blurred background.
+- True-to-life colour. No boosted saturation, no grading, no HDR halos, no plastic skin.
+Do NOT simulate a phone photo with fake artifacts — no added grain, no fake lens flare, no vignette, no timestamp. It should simply BE an ordinary well-taken photo.`;
 
 const DSLR = `PHOTOGRAPHIC CHARACTER:
 Authentic candid feel captured naturally on a high-end DSLR with a 35mm lens — not overly staged, not stock-photo perfect, not cinematic Hollywood. The goal is emotional realism, a real weekend moment rather than a photoshoot.

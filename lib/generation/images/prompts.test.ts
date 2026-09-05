@@ -46,12 +46,55 @@ test("mixed beyond the bank size wraps into a fresh permutation", () => {
 });
 
 test("the no-chrome instruction survives in every industry", () => {
+  // Asserts the requirement, not the wording: this used to be seven bullets at
+  // the very front of the prompt and is now one line at the back.
   for (const industry of ["boat_club", "marina", "med_spa", "insurance"]) {
     const p = buildImagePrompt({ ...base, industry });
-    assert.match(p, /PHOTOGRAPH ONLY/, industry);
-    assert.match(p, /DO NOT render any text/, industry);
-    assert.match(p, /DO NOT render any button/, industry);
+    assert.match(p, /NO TEXT OR GRAPHICS/, industry);
+    assert.match(p, /No text, letters, numbers or typography/, industry);
+    assert.match(p, /no buttons, banners or UI/, industry);
   }
+});
+
+test("the picture comes before the rules that qualify it", () => {
+  // The whole point of the rewrite. The old prompt spent its first 900
+  // characters forbidding text and did not describe the photograph until
+  // character 1,965, by which point the model had stopped listening.
+  const p = buildImagePrompt({
+    ...base,
+    sceneText: "Kneeling to swap a sediment cartridge, old one on newspaper beside him.",
+    framingText: "Close on the hands, from about arm's length.",
+  });
+
+  assert.ok(p.indexOf("Kneeling to swap") < 120, "the scene must open the prompt");
+  assert.ok(
+    p.indexOf("Close on the hands") < p.indexOf("ANATOMY RULES"),
+    "framing must precede the hard rules",
+  );
+  assert.ok(
+    p.indexOf("NO TEXT OR GRAPHICS") > p.indexOf("PHOTOGRAPHIC CHARACTER"),
+    "chrome rules belong in the tail",
+  );
+});
+
+test("nobody is presenting anything to the camera", () => {
+  // Every image in the batch that triggered this was a man holding a part up
+  // for the lens, which is the stock-photo read that survived every other fix.
+  const p = buildImagePrompt({ ...base, industry: "home_services" });
+  assert.match(p, /THIS IS NOT A DEMONSTRATION/);
+  assert.match(p, /Nobody is aware of the camera/);
+});
+
+test("the prompt stays short enough that its front matter is the picture", () => {
+  const p = buildImagePrompt({
+    ...base,
+    industry: "home_services",
+    sceneText: "Kneeling to swap a sediment cartridge.",
+    framingText: "Close on the hands.",
+  });
+  // 4,251 characters was the version that produced six unusable images, and
+  // most of that length sat in front of the picture.
+  assert.ok(p.length < 3200, `prompt is ${p.length} chars, back to a wall of rules`);
 });
 
 test("realism and anatomy rules apply to every industry, not just boat clubs", () => {
