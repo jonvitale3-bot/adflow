@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { cached } from "@/lib/meta/cache";
 import { listCampaigns, MetaApiError } from "@/lib/meta/client";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,12 +14,17 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const adAccountId = params.get("adAccountId");
   const business = params.get("business");
+  const refresh = params.get("refresh") === "1";
   if (!adAccountId) {
     return NextResponse.json({ error: "adAccountId is required" }, { status: 400 });
   }
 
   try {
-    const campaigns = await listCampaigns(adAccountId, business);
+    const campaigns = await cached(
+      `campaigns:${business ?? ""}:${adAccountId}`,
+      () => listCampaigns(adAccountId, business),
+      { ttlMs: 5 * 60_000, refresh },
+    );
     return NextResponse.json({ campaigns });
   } catch (err) {
     const message = err instanceof MetaApiError ? err.message : "Could not load campaigns";

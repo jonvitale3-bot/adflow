@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { cached } from "@/lib/meta/cache";
 import {
   createPageBackedInstagramAccount,
   listInstagramAccounts,
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
   const adAccountId = url.searchParams.get("adAccountId");
   const pageId = url.searchParams.get("pageId") ?? undefined;
   const business = url.searchParams.get("business");
+  const refresh = url.searchParams.get("refresh") === "1";
 
   if (!adAccountId) {
     return NextResponse.json({ error: "adAccountId is required" }, { status: 400 });
@@ -30,7 +32,13 @@ export async function GET(request: Request) {
     // The attempts come back too. Four endpoints are merged, so an empty list
     // could mean the client genuinely has no Instagram identity or that every
     // request failed, and those need different fixes.
-    const { accounts, attempts } = await listInstagramAccounts(adAccountId, pageId, business);
+    // Seven Graph calls behind one request, which made this the most
+    // expensive thing on a screen that reloads whenever the client changes.
+    const { accounts, attempts } = await cached(
+      `instagram:${business ?? ""}:${adAccountId}:${pageId ?? ""}`,
+      () => listInstagramAccounts(adAccountId, pageId, business),
+      { ttlMs: 15 * 60_000, refresh },
+    );
     return NextResponse.json({ accounts, attempts });
   } catch (err) {
     const message = err instanceof MetaApiError ? err.message : "Could not load Instagram accounts";

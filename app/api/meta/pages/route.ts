@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { cached } from "@/lib/meta/cache";
 import { listPages, MetaApiError } from "@/lib/meta/client";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,9 +21,14 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const business = params.get("business");
   const adAccountId = params.get("adAccountId");
+  const refresh = params.get("refresh") === "1";
 
   try {
-    const pages = await listPages(business, adAccountId);
+    const pages = await cached(
+      `pages:${business ?? ""}:${adAccountId ?? ""}`,
+      () => listPages(business, adAccountId),
+      { ttlMs: 15 * 60_000, refresh },
+    );
     return NextResponse.json({
       pages: pages
         .map((p) => ({ id: p.id, name: p.name }))

@@ -62,13 +62,14 @@ export function DestinationPicker({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadCampaigns = useCallback(async () => {
+  const loadCampaigns = useCallback(async (refresh = false) => {
     if (!adAccountId) return;
     setLoading("campaigns");
     setError(null);
     try {
       const params = new URLSearchParams({ adAccountId });
       if (business) params.set("business", business);
+      if (refresh) params.set("refresh", "1");
       const res = await fetch(`/api/meta/campaigns?${params}`);
       const body = await res.json();
       if (!res.ok) setError(body.error);
@@ -132,7 +133,7 @@ export function DestinationPicker({
   }
 
   const loadAdSets = useCallback(
-    async (campaignId: string) => {
+    async (campaignId: string, refresh = false) => {
       if (!campaignId) {
         setAdSets([]);
         return;
@@ -141,8 +142,9 @@ export function DestinationPicker({
       setError(null);
       try {
         const params = new URLSearchParams({ campaignId });
-      if (business) params.set("business", business);
-      const res = await fetch(`/api/meta/adsets?${params}`);
+        if (business) params.set("business", business);
+        if (refresh) params.set("refresh", "1");
+        const res = await fetch(`/api/meta/adsets?${params}`);
         const body = await res.json();
         if (!res.ok) setError(body.error);
         else setAdSets(body.adSets);
@@ -170,7 +172,17 @@ export function DestinationPicker({
       {error && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-warning-subtle bg-warning-subtle px-3 py-2">
           <p className="text-[12px] text-warning-on-subtle">{error}</p>
-          <Button size="row" onClick={loadCampaigns}>Retry</Button>
+          {/* Retries whatever failed, and goes past the cache: asking again
+              for the answer already stored is not a retry. */}
+          <Button
+            size="row"
+            onClick={() => {
+              void loadCampaigns(true);
+              if (value.campaignId) void loadAdSets(value.campaignId, true);
+            }}
+          >
+            Retry
+          </Button>
         </div>
       )}
 
