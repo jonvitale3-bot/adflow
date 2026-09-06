@@ -64,7 +64,6 @@ export function ReviewGrid({
   // also covers imported copy and stays current when a rule changes.
   const validate = industry === "boat_club" ? validateBoatClubVariation : validateVariation;
 
-  const drafts = variations.filter((v) => v.status === "draft");
   const pushed = variations.filter((v) => v.status === "pushed");
   const failed = variations.filter((v) => v.status === "failed");
 

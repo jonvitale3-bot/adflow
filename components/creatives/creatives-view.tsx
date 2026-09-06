@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 import { groupByStem, groupKey } from "@/lib/creatives/filenames";
 import { ACCEPTED_TYPES, prepareImage, storagePath, type PreparedImage } from "@/lib/creatives/image";

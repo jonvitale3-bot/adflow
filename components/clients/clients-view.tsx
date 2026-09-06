@@ -16,7 +16,6 @@ import {
   groupByBrand,
   industryLabel,
   locationOf,
-  INDUSTRY_LABELS,
   type ClientRow,
 } from "@/lib/clients/grouping";
 

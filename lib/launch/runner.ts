@@ -405,7 +405,7 @@ async function rejectOne(db: Db, variationId: string, business: string | null): 
 
   if (!variation) throw new Error("Variation not found");
 
-  // Already gone from Meta; just settle the row.
+  // Only an ad that reached Meta has anything to remove there.
   if (variation.meta_ad_id) {
     await deleteAd(variation.meta_ad_id, business);
   }

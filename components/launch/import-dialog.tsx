@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
-import { cn } from "@/lib/cn";
 
 interface Warning {
   rule: string;

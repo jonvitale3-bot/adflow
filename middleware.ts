@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
-const PUBLIC_PATHS = ["/login", "/auth"];
+// Only the login page. "/auth" used to be listed too, for a callback route
+// that was never built; a public prefix guarding nothing is a hole waiting for
+// someone to add a route under it.
+const PUBLIC_PATHS = ["/login"];
 
 /**
  * Refreshes the Supabase session on every request and gates the app behind

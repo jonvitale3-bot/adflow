@@ -79,7 +79,11 @@ export async function describeImage(imageUrl: string): Promise<ImageLook> {
 
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 300,
+    // Thinking is on by default on this model and its tokens count against
+    // max_tokens. At 300 the answer was competing with the reasoning for room,
+    // and a sentence plus a boolean does not need reasoning at depth.
+    max_tokens: 1500,
+    output_config: { effort: "low", format: zodOutputFormat(LookSchema) },
     system: SYSTEM,
     messages: [
       {
@@ -97,7 +101,6 @@ export async function describeImage(imageUrl: string): Promise<ImageLook> {
         ],
       },
     ],
-    output_config: { format: zodOutputFormat(LookSchema) },
   });
 
   if (response.stop_reason === "refusal") {
