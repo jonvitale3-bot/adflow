@@ -59,3 +59,16 @@ test("order within a group is the order dropped", () => {
   const groups = groupByStem(["a-9x16.jpg", "a-1x1.jpg"], (f) => f);
   assert.deepEqual(groups[0]!.files, ["a-9x16.jpg", "a-1x1.jpg"]);
 });
+
+test("the abbreviations designers actually type are size markers", () => {
+  // "Keys_4-Horz" arrived beside "Keys_4-Sq" and "Keys_4-Vert" and became its
+  // own creative, because the list knew "horiz" and not "horz".
+  assert.equal(stemOf("Keys_4-Horz.jpg"), "Keys_4");
+  assert.equal(groupKey("Keys_4-Horz.jpg"), groupKey("Keys_4-Vert.jpg"));
+  assert.equal(groupKey("Keys_4-Horz.jpg"), groupKey("Keys_4-Sq.jpg"));
+  assert.equal(stemOf("hero-hor.png"), "hero");
+  assert.equal(stemOf("hero-land.png"), "hero");
+  assert.equal(stemOf("hero-port.png"), "hero");
+  assert.equal(stemOf("hero-tall.png"), "hero");
+  assert.equal(stemOf("hero-sqr.png"), "hero");
+});

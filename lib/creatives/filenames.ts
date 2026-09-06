@@ -21,7 +21,9 @@ const SIZE_TOKEN = new RegExp(
     // Pixel dimensions: 1080x1080, 1200x628.
     String.raw`\d{3,4}\s*[x×]\s*\d{3,4}`,
     // Words.
-    String.raw`(?:squares?|sq|verticals?|vert|portraits?|stor(?:y|ies)|reels?|landscapes?|horizontals?|horiz|wide|banners?|feed)`,
+    // "Horz" was the one a real export used and the one this list lacked, so
+    // three horizontals arrived as three new creatives beside their siblings.
+    String.raw`(?:squares?|sqr?|verticals?|vert|portraits?|port|tall|stor(?:y|ies)|reels?|landscapes?|land|horizontals?|horiz|horz|hor|hz|wide|banners?|feed)`,
   ].join("|"),
   "i",
 );
