@@ -42,8 +42,8 @@ interface Creative {
   }>;
 }
 
-export function CreativesView({ clients }: { clients: ClientOption[] }) {
-  const [clientId, setClientId] = useState(clients[0]?.id ?? "");
+export function CreativesView({ client }: { client: ClientOption }) {
+  const clientId = client.id;
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [loading, setLoading] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -56,8 +56,6 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
   const [dragging, setDragging] = useState(false);
   const [generating, setGenerating] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  const client = clients.find((c) => c.id === clientId);
 
   const load = useCallback(async () => {
     if (!clientId) return;
@@ -410,39 +408,12 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
     }
   }
 
-  if (clients.length === 0) {
-    return (
-      <>
-        <Header />
-        <div className="mx-auto w-full max-w-[1120px] p-6">
-          <div className="rounded-lg border border-border bg-surface shadow-raised">
-            <EmptyState
-              title="No clients yet"
-              body="Creatives belong to a client. Add one first and its image library appears here."
-            />
-          </div>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <Header />
       <div className="mx-auto w-full max-w-[1120px] p-6">
         <div className="rounded-lg border border-border bg-surface shadow-raised">
           <div className="flex flex-wrap items-center gap-2.5 border-b border-border px-6 py-3">
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              aria-label="Client"
-              className="h-8 min-w-[220px] rounded-md border border-border-strong bg-surface px-2.5 text-[13px] outline-none focus:border-accent focus:focus-ring"
-            >
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-
             <span className="tabular text-[12px] text-text-secondary">
               {visible.length} {showArchived ? "archived" : "active"}
             </span>
@@ -469,7 +440,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
               {unsyncedImages > 0 && (
                 <Button
                   onClick={syncToMeta}
-                  disabled={syncing || !client?.meta_ad_account_id}
+                  disabled={syncing || !client.meta_ad_account_id}
                   title="Uploads every size that Meta does not have yet. Each aspect ratio is a separate image in the ad account."
                 >
                   {syncing
@@ -484,7 +455,7 @@ export function CreativesView({ clients }: { clients: ClientOption[] }) {
             </div>
           </div>
 
-          {!client?.meta_ad_account_id && (
+          {!client.meta_ad_account_id && (
             <p className="border-b border-border bg-warning-subtle px-6 py-2 text-[12px] text-warning-on-subtle">
               ▲ This client has no ad account id, so images cannot be uploaded to Meta yet.
             </p>

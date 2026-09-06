@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -18,14 +19,18 @@ import {
   locationOf,
   type ClientRow,
 } from "@/lib/clients/grouping";
+import { clientPath } from "@/lib/clients/paths";
+import { NO_WORK, sumStats, type ClientStats } from "@/lib/clients/stats";
 
-const GRID = "grid grid-cols-[1fr_130px_170px_150px_150px] items-center gap-3 px-6";
+const GRID = "grid grid-cols-[1fr_120px_150px_190px_130px_150px] items-center gap-3 px-6";
 
 export function ClientsView({
   clients,
+  stats,
   loadError,
 }: {
   clients: ClientRow[];
+  stats: Record<string, ClientStats>;
   loadError: string | null;
 }) {
   const router = useRouter();
@@ -160,6 +165,7 @@ export function ClientsView({
                 <span>Client</span>
                 <span>Industry</span>
                 <span>Market</span>
+                <span>Work</span>
                 <span>Ad account</span>
                 <span />
               </div>
@@ -170,6 +176,7 @@ export function ClientsView({
                     <ClientRowView
                       key={entry.client.id}
                       client={entry.client}
+                      stats={stats[entry.client.id] ?? NO_WORK}
                       busy={deleting === entry.client.id}
                       onEdit={() => setPanel({ open: true, client: entry.client })}
                       onVoice={() => setVoiceFor(entry.client)}
@@ -209,6 +216,7 @@ export function ClientsView({
                         <span className="truncate text-text-secondary">
                           {entry.clients.length} markets
                         </span>
+                        <WorkCell stats={sumStats(entry.clients.map((c) => c.id), stats)} />
                         <span>
                           {entry.connectedCount === entry.clients.length ? (
                             <Badge tone="success" glyph="●">All connected</Badge>
@@ -227,6 +235,7 @@ export function ClientsView({
                             <ClientRowView
                               key={client.id}
                               client={client}
+                              stats={stats[client.id] ?? NO_WORK}
                               indented
                               busy={deleting === client.id}
                               onEdit={() => setPanel({ open: true, client })}
@@ -282,6 +291,7 @@ function toFormValues(client: ClientRow) {
 
 function ClientRowView({
   client,
+  stats,
   indented = false,
   onEdit,
   onDelete,
@@ -289,6 +299,7 @@ function ClientRowView({
   busy,
 }: {
   client: ClientRow;
+  stats: ClientStats;
   indented?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -304,13 +315,21 @@ function ClientRowView({
         "h-11 border-b border-[#f0f0f2] text-[13px] last:border-b-0 hover:bg-surface-muted",
       )}
     >
+      {/* The name is the way in. One click opens the client's workspace on
+          Launch, which is the job; Creatives is one tab over from there. */}
       <span className={cn("truncate", indented && "pl-[22px]")}>
-        {indented ? (location ?? client.name) : client.name}
+        <Link
+          href={clientPath(client.id, "launch")}
+          className="font-[550] text-text-primary hover:text-accent hover:underline"
+        >
+          {indented ? (location ?? client.name) : client.name}
+        </Link>
       </span>
       <span className="truncate text-text-secondary">{industryLabel(client.industry)}</span>
       <span className="truncate text-text-secondary">
         {client.market_name ?? client.location_description ?? "—"}
       </span>
+      <WorkCell stats={stats} clientId={client.id} />
       <span>
         <AdAccountBadge state={adAccountState(client)} />
       </span>
@@ -367,6 +386,37 @@ function RowActions({
       >
         {busy ? "…" : "Delete"}
       </Button>
+    </span>
+  );
+}
+
+/**
+ * What is waiting behind a row. "No creatives" links straight to the fix,
+ * because landing on Launch for that client would be a dead end.
+ */
+function WorkCell({ stats, clientId }: { stats: ClientStats; clientId?: string }) {
+  if (stats.creatives === 0) {
+    const badge = (
+      <Badge tone="warning" glyph="▲">
+        No creatives
+      </Badge>
+    );
+    return (
+      <span>{clientId ? <Link href={clientPath(clientId, "creatives")}>{badge}</Link> : badge}</span>
+    );
+  }
+
+  return (
+    <span className="tabular truncate text-text-secondary">
+      {stats.creatives} creative{stats.creatives === 1 ? "" : "s"}
+      {stats.drafts > 0 && (
+        <>
+          {" · "}
+          <span className="font-[550] text-text-primary">
+            {stats.drafts} draft{stats.drafts === 1 ? "" : "s"}
+          </span>
+        </>
+      )}
     </span>
   );
 }

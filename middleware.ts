@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { clientIdFromPath, LAST_CLIENT_COOKIE } from "@/lib/clients/paths";
+
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 // Only the login page. "/auth" used to be listed too, for a callback route
@@ -60,6 +62,18 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/clients";
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  // Remember the client being worked on, so the bare /creatives and /launch
+  // links open it rather than whoever sorts first alphabetically.
+  const clientId = clientIdFromPath(pathname);
+  if (user && clientId) {
+    response.cookies.set(LAST_CLIENT_COOKIE, clientId, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+      httpOnly: true,
+    });
   }
 
   return response;

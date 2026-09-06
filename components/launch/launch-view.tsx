@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+
+import { clientPath } from "@/lib/clients/paths";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,13 +45,13 @@ interface Defaults {
 type Stage = "setup" | "review";
 
 export function LaunchView({
-  clients,
+  client,
   defaults,
 }: {
-  clients: ClientRecord[];
-  defaults: Defaults[];
+  client: ClientRecord;
+  defaults: Defaults | null;
 }) {
-  const [clientId, setClientId] = useState(clients[0]?.id ?? "");
+  const clientId = client.id;
   const [count, setCount] = useState(12);
   const [destination, setDestination] = useState<Destination>({
     campaignId: "",
@@ -64,12 +67,10 @@ export function LaunchView({
   const [matchToImage, setMatchToImage] = useState(true);
   const [importing, setImporting] = useState(false);
 
-  const client = clients.find((c) => c.id === clientId);
-
   // The saved destination loads with the client, so a repeat launch needs no
   // re-picking.
   useEffect(() => {
-    const saved = defaults.find((d) => d.client_id === clientId);
+    const saved = defaults;
     setDestination({
       campaignId: saved?.meta_campaign_id ?? "",
       adSetId: saved?.meta_adset_id ?? "",
@@ -380,22 +381,6 @@ export function LaunchView({
   const pushed = variations.filter((v) => v.status === "pushed");
   const canPush = Boolean(destination.adSetId) && drafts.length > 0;
 
-  if (clients.length === 0) {
-    return (
-      <>
-        <Header />
-        <div className="mx-auto w-full max-w-[1120px] p-6">
-          <div className="rounded-lg border border-border bg-surface shadow-raised">
-            <EmptyState
-              title="No clients yet"
-              body="Launch needs a client with an ad account and a landing page. Add one first."
-            />
-          </div>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <Header />
@@ -425,17 +410,11 @@ export function LaunchView({
             </p>
 
             <div className="flex flex-col gap-3.5">
-              <Select label="Client" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Select>
-
               <DestinationPicker
-                adAccountId={client?.meta_ad_account_id ?? null}
-                pageId={client?.meta_page_id ?? null}
-                business={client?.meta_business ?? null}
-                clientName={client?.name ?? ""}
+                adAccountId={client.meta_ad_account_id ?? null}
+                pageId={client.meta_page_id ?? null}
+                business={client.meta_business ?? null}
+                clientName={client.name ?? ""}
                 value={destination}
                 onChange={setDestination}
               />
@@ -469,11 +448,14 @@ export function LaunchView({
             {creativeCount === 0 && (
               <p className="mt-4 rounded-md border border-warning-subtle bg-warning-subtle px-3 py-2 text-[12px] text-warning-on-subtle">
                 ▲ This client has no creatives. Copy will generate, but ads cannot be
-                pushed without an image. Add or generate creatives first.
+                pushed without an image.{" "}
+                <Link href={clientPath(client.id, "creatives")} className="font-semibold underline">
+                  Add or generate creatives first.
+                </Link>
               </p>
             )}
 
-            {!client?.landing_page_url && (
+            {!client.landing_page_url && (
               <p className="mt-3 rounded-md border border-danger-border bg-danger-subtle px-3 py-2 text-[12px] text-danger-on-subtle">
                 ! This client has no landing page URL. Ads cannot be created without one.
               </p>
@@ -519,7 +501,7 @@ export function LaunchView({
                 pushedCount={pushed.length}
                 onPush={(ids) => runJob("push", ids)}
                 onReject={(ids) => runJob("reject", ids)}
-                industry={client?.industry ?? ""}
+                industry={client.industry ?? ""}
           onRefresh={refresh}
           onDiscard={discard}
           onFixDashes={fixDashes}

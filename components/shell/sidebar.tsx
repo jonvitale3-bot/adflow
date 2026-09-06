@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/cn";
+import { clientIdFromPath, clientPath, sectionFromPath, type Section } from "@/lib/clients/paths";
 import { createClient } from "@/lib/supabase/client";
 
 interface NavItem {
@@ -12,6 +13,8 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   countKey?: "clients" | "creatives";
+  /** A step inside a client: the link follows whichever client is open. */
+  section?: Section;
 }
 
 const stroke = {
@@ -37,6 +40,7 @@ const NAV: NavItem[] = [
   {
     href: "/creatives",
     label: "Creatives",
+    section: "creatives",
     countKey: "creatives",
     icon: (
       <svg viewBox="0 0 15 15" width={15} height={15} {...stroke}>
@@ -49,6 +53,7 @@ const NAV: NavItem[] = [
   {
     href: "/launch",
     label: "Launch",
+    section: "launch",
     icon: (
       <svg viewBox="0 0 15 15" width={15} height={15} {...stroke}>
         <path d="M7.5 1.5c2.5 1.5 4 4 4 7l-4 4-4-4c0-3 1.5-5.5 4-7z" />
@@ -78,6 +83,8 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const currentClient = clientIdFromPath(pathname);
+  const currentSection = sectionFromPath(pathname);
 
   // Remembered per browser. Read after mount rather than during render, so the
   // server and the first client render agree.
@@ -170,13 +177,19 @@ export function Sidebar({
 
       <ul className="mt-3.5 flex flex-col gap-0.5">
         {NAV.map((item) => {
-          const active = pathname.startsWith(item.href);
+          // Inside a client, Creatives and Launch mean that client's. Outside,
+          // they open the one last worked on.
+          const href =
+            item.section && currentClient ? clientPath(currentClient, item.section) : item.href;
+          const active = item.section
+            ? currentSection === item.section
+            : !currentSection && pathname.startsWith(item.href);
           const count = item.countKey ? counts[item.countKey] : undefined;
 
           return (
             <li key={item.href}>
               <Link
-                href={item.href}
+                href={href}
                 title={collapsed ? item.label : undefined}
                 aria-current={active ? "page" : undefined}
                 className={cn(

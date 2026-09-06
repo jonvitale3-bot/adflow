@@ -1,20 +1,27 @@
-import { LaunchView } from "@/components/launch/launch-view";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { clientPath, isUuid, LAST_CLIENT_COOKIE } from "@/lib/clients/paths";
 import { createClient } from "@/lib/supabase/server";
 
+/**
+ * Opens the client last worked on, or the list when there is none yet. This
+ * used to render every client's launch behind a dropdown that always
+ * started at whoever sorted first.
+ */
 export default async function LaunchPage() {
-  const supabase = await createClient();
+  const remembered = (await cookies()).get(LAST_CLIENT_COOKIE)?.value;
 
-  const { data: clients } = await supabase
-    .from("clients")
-    .select(
-      "id, name, industry, marine_business_type, meta_ad_account_id, meta_page_id, meta_business, landing_page_url, location_description, market_name, season_type, current_promotion, business_type_description, offer_description, tone_keywords",
-    )
-    .eq("archived", false)
-    .order("name");
+  if (isUuid(remembered)) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("id", remembered)
+      .eq("archived", false)
+      .maybeSingle();
+    if (data) redirect(clientPath(data.id, "launch"));
+  }
 
-  const { data: defaults } = await supabase
-    .from("client_launch_defaults")
-    .select("client_id, meta_campaign_id, meta_adset_id, instagram_account_id, default_batch_size");
-
-  return <LaunchView clients={clients ?? []} defaults={defaults ?? []} />;
+  redirect("/clients");
 }
