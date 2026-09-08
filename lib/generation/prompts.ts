@@ -134,8 +134,9 @@ const CTA_RULES = ` CTA RULES (CRITICAL, these override everything else for the 
  - NEVER use the words "click", "tap", "instant access", "learn more" (as a verb), or "act now" in the CTA line.
  - NEVER say "Click Learn More" or "Hit Learn More". Meta penalizes this and it sounds robotic.
  - The CTA should describe what the user will GET or DO next, with a clear action-driven verb that creates real urgency.
- - Lead with strong action verbs: "Join", "Claim", "Reserve", "Grab", "Lock in", "Secure", "Start", "Get". Membership/season-driven urgency is encouraged ("before summer", "this season", "this week", "spots filling").
- - Good CTAs: "👇 Join now before summer fills up", "Claim your spot this season 👇", "👇 Reserve your home marina today", "Lock in membership this week 👇", "👇 Start boating this weekend", "Grab a spot before the season starts 👇", "👇 Secure your membership now".
+ - Lead with strong action verbs: "Join", "Claim", "Reserve", "Grab", "Lock in", "Secure", "Start", "Get". Membership/season-driven urgency is encouraged ("this season", "this week", "this weekend", "spots filling").
+ - Good CTAs: "👇 Join now before spots fill up", "Claim your spot this season 👇", "👇 Reserve your home marina today", "Lock in membership this week 👇", "👇 Start boating this weekend", "👇 Secure your membership now".
+ - A CTA that names a season must agree with the SEASONAL URGENCY CONTEXT and today's date given there. "Before summer" in the fall is wrong.
  - Avoid soft/passive phrasing like "See what's open", "Explore options", "Check availability". Push for action.
  - Use one emoji (👇 preferred, it points to the Learn More button). Keep the line under 9 words. Never use fake scarcity ("only 3 left", specific countdowns). Keep urgency seasonal/membership-driven and truthful.`;
 

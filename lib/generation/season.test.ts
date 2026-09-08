@@ -95,3 +95,25 @@ test("promo section carries the 30% instruction and the do-not-paste rule", () =
   assert.match(out, /Do not just paste it in mechanically/);
   assert.ok(out.includes("$500 off initiation this month"));
 });
+
+test("every branch tells the model what day it is, in the client's time", () => {
+  // 03:00 UTC on 8 September is still 7 September in California.
+  const d = new Date("2026-09-08T03:00:00Z");
+  assert.match(buildSeasonalSection("seasonal", d, "America/Los_Angeles"), /TODAY IS September 7, 2026/);
+  assert.match(buildSeasonalSection("seasonal", d, "UTC"), /TODAY IS September 8, 2026/);
+  assert.match(buildSeasonalSection("year_round", d, NY), /TODAY IS September/);
+  assert.match(buildSeasonalSection("seasonal", new Date("2026-01-15T12:00:00Z"), NY), /TODAY IS January 15, 2026/);
+});
+
+test("late season says summer is behind us and bans writing as if it is ahead", () => {
+  // The ad that prompted this, written 8 September: "before summer demand hits".
+  const out = buildSeasonalSection("seasonal", new Date("2026-09-08T12:00:00Z"), NY);
+  assert.match(out, /Summer is behind us/);
+  assert.match(out, /AVOID: "before summer demand hits"/);
+  assert.match(out, /head start on next/);
+});
+
+test("pre-season still frames around the summer ahead, because there it is true", () => {
+  const out = buildSeasonalSection("seasonal", new Date("2026-11-15T12:00:00Z"), NY);
+  assert.match(out, /before summer demand hits/);
+});

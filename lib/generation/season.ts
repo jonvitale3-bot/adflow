@@ -31,6 +31,23 @@ export function monthNameInTimeZone(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", { timeZone, month: "long" }).format(date);
 }
 
+/**
+ * The date itself, in the client's time. The bucket below says which part of
+ * the season it is; this says what day it is, so "before summer" can be
+ * judged against a calendar rather than guessed. An ad written on 8 September
+ * told people to join "before summer demand hits", because the model was
+ * given a season and no date.
+ */
+function todayLine(date: Date, timeZone: string): string {
+  const day = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+  return `TODAY IS ${day} (the client's local date). Write from this date. Summer means the summer that this date sits in or the one ahead of it, never one that has already passed. The month itself still must not appear in the copy.`;
+}
+
 export function buildSeasonalSection(
   seasonType: SeasonType,
   date: Date,
@@ -58,14 +75,16 @@ ${NEVER_NAME_MONTH}
 At least 60% of variations should use the fomo or weekend angle. Every ad, regardless of angle, should carry a subtle "the time is now" undertone.
 Do NOT use winter, spring-prep, or "get ready for next season" framing. The season is HERE.`;
   } else if (month >= 8 && month <= 9) {
-    note = `LATE BOATING SEASON. Lean into "still warm, still on the water" + "lock in before next summer fills up" urgency. ${NEVER_NAME_MONTH}`;
+    note = `LATE BOATING SEASON. Summer is behind us. The water is still warm and members are still out, so lean into "still warm, still on the water" and "the season is not over yet" urgency.
+DO NOT write as if summer is ahead. Specifically AVOID: "before summer demand hits", "before summer fills up", "get ready for summer", "lock in before summer". Anyone reading that in the fall knows the summer already happened.
+Forward-looking urgency is about NEXT season and must say so: "join now for the rest of this season and a head start on next", "be first on the water when spring comes". ${NEVER_NAME_MONTH}`;
   } else if (month >= 10 || month <= 1) {
     note = `PRE-SEASON. Frame around "lock in your spot before summer demand hits" and "be ready when the weather turns". ${NEVER_NAME_MONTH}`;
   } else {
     note = `SPRING RAMP-UP. Frame around "season is starting", "first warm weekends", and "get on the water before the rush". ${NEVER_NAME_MONTH}`;
   }
 
-  return `\nSEASONAL URGENCY CONTEXT (CRITICAL):\n${note}\n`;
+  return `\nSEASONAL URGENCY CONTEXT (CRITICAL):\n${todayLine(date, timeZone)}\n${note}\n`;
 }
 
 /**
