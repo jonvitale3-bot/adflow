@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { ClientRow } from "@/lib/clients/grouping";
 import { tallyStats } from "@/lib/clients/stats";
 
+export const metadata = { title: "Clients" };
+
 export default async function ClientsPage() {
   const supabase = await createClient();
 

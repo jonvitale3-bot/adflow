@@ -2,6 +2,8 @@ import { SettingsView } from "@/components/settings/settings-view";
 import { env } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "Settings" };
+
 export default async function SettingsPage() {
   const supabase = await createClient();
   const {

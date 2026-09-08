@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { LaunchView } from "@/components/launch/launch-view";
 import { createClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "Launch" };
+
 export default async function ClientLaunchPage({
   params,
 }: {

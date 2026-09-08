@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AdFlow",
+  title: { default: "AdFlow", template: "%s · AdFlow" },
   description: "Generate and launch Meta ad drafts.",
 };
 

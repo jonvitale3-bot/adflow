@@ -1,7 +1,21 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ClientHeader } from "@/components/clients/client-header";
 import { createClient } from "@/lib/supabase/server";
+
+/** The tab reads "Launch · Keys Marina · AdFlow", which is findable in a row of tabs. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data } = await supabase.from("clients").select("name").eq("id", id).maybeSingle();
+  const name = data?.name ?? "Client";
+  return { title: { default: name, template: `%s · ${name} · AdFlow` } };
+}
 
 /**
  * Everything under /clients/[id] is one client's workspace. The header names

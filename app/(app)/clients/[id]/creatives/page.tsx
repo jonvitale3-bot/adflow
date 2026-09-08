@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { CreativesView } from "@/components/creatives/creatives-view";
 import { createClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "Creatives" };
+
 export default async function ClientCreativesPage({
   params,
 }: {
