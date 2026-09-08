@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveClientTimezone } from "@/lib/clients/resolve-timezone";
+import { timeZoneOrDefault } from "@/lib/clients/timezone";
 import { mayReframe } from "@/lib/creatives/placement";
 import { ratioOf, type Ratio } from "@/lib/creatives/ratios";
 import { buildAssetFeedSpec, type RatioAsset } from "@/lib/meta/asset-feed";
@@ -213,7 +215,7 @@ async function pushOne(
           name: buildAdName(
             client.name,
             variation.headline,
-            client.timezone ?? "America/New_York",
+            timeZoneOrDefault(client.timezone),
           ),
           pixelId: client.meta_pixel_id ?? undefined,
           business: client.meta_business,
@@ -432,12 +434,15 @@ export async function runJobSlice(db: Db, jobId: string): Promise<RunResult> {
   const { data: client } = await db
     .from("clients")
     .select(
-      "id, name, meta_ad_account_id, meta_page_id, meta_pixel_id, instagram_account_id, landing_page_url, meta_business",
+      "id, name, meta_ad_account_id, meta_page_id, meta_pixel_id, instagram_account_id, landing_page_url, meta_business, timezone",
     )
     .eq("id", job.client_id)
     .single();
 
   if (!client) throw new Error("Client not found");
+
+  // Ad names carry the launch date, in the client's day, not UTC's.
+  client.timezone = await resolveClientTimezone(db, client);
 
   if (job.status === "queued") {
     await db

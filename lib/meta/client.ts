@@ -106,6 +106,22 @@ export function listAdAccounts(business?: string | null): Promise<AdAccount[]> {
   );
 }
 
+/**
+ * The zone an ad account reports in, as an IANA name. It is the client's own
+ * clock: Meta sets it from the account's business address and the client's
+ * reporting already runs on it. Better than inferring from a location string.
+ */
+export async function getAdAccountTimezone(
+  adAccountId: string,
+  business?: string | null,
+): Promise<string | null> {
+  const body = await request<{ timezone_name?: string }>(
+    url(adAccountId, { fields: "timezone_name" }),
+    { business },
+  );
+  return body.timezone_name ?? null;
+}
+
 export interface Page {
   id: string;
   name: string;

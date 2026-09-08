@@ -192,6 +192,7 @@ export function LaunchView({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          clientId: client.id,
           clientName: client.name,
           locationDescription: client.location_description ?? client.name,
           industry: client.industry,

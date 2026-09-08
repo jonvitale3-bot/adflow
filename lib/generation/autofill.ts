@@ -46,6 +46,11 @@ export const AutofillSchema = z.object({
       "What the ad drives to. If the page states a real offer, describe it. Otherwise a generic action — NEVER an invented discount, price, percentage or deadline.",
     ),
   tone_keywords: z.string().describe("Four to six tone words, comma separated."),
+  timezone: z
+    .string()
+    .describe(
+      "IANA time zone for this location, e.g. America/Los_Angeles or America/Chicago. Empty if the location is unknown.",
+    ),
 });
 
 export type AutofillValues = z.infer<typeof AutofillSchema>;

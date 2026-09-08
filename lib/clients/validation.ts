@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isValidTimeZone } from "./timezone.ts";
+
 /**
  * Client form validation. Mirrors the database constraints so a mistake is
  * caught at the field rather than surfacing later as a Meta API error — which
@@ -86,6 +88,11 @@ export const ClientFormSchema = z
     offer_description: z.string().trim().default(""),
     tone_keywords: z.string().trim().default(""),
     current_promotion: z.string().trim().default(""),
+    timezone: z
+      .string()
+      .trim()
+      .default("")
+      .refine((v) => v === "" || isValidTimeZone(v), { message: "Not a recognised time zone" }),
   })
   // A marina with no service falls through to the generic prompt and quietly
   // produces worse creative, so the database rejects it and so does the form.

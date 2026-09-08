@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { generateCopy } from "@/lib/generation/copy";
 import { CopyGenerationError } from "@/lib/generation/copy";
+import { resolveClientTimezone } from "@/lib/clients/resolve-timezone";
 import { createClient } from "@/lib/supabase/server";
 
 // Generating 50 variations with adaptive thinking runs well past the default
@@ -23,6 +24,8 @@ const RequestSchema = z.object({
   neverSay: z.string().optional(),
   adExamples: z.string().optional(),
   count: z.number().int().min(1).max(50).default(10),
+  /** When given, the zone comes from the client record, not the body. */
+  clientId: z.string().uuid().optional(),
   timeZone: z.string().default("America/New_York"),
   pairedImages: z.array(z.string().nullable()).optional(),
 });
@@ -56,6 +59,18 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
 
+  // "Today" in the prompt is the client's today. New York for everyone was
+  // how a NorCal ad came to be written a day early at the boundary.
+  let timeZone = input.timeZone;
+  if (input.clientId) {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("id, timezone, meta_ad_account_id, meta_business")
+      .eq("id", input.clientId)
+      .maybeSingle();
+    if (client) timeZone = await resolveClientTimezone(supabase, client);
+  }
+
   try {
     const result = await generateCopy({
       clientName: input.clientName,
@@ -73,7 +88,7 @@ export async function POST(request: Request) {
         adExamples: input.adExamples,
       },
       count: input.count,
-      timeZone: input.timeZone,
+      timeZone,
       pairedImages: input.pairedImages,
     });
 

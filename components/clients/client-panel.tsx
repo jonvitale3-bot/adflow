@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/skeleton";
+import { Combobox } from "@/components/ui/combobox";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { PagePicker } from "@/components/clients/page-picker";
 import { cn } from "@/lib/cn";
@@ -39,7 +40,23 @@ const EMPTY: ClientFormValues = {
   offer_description: "",
   tone_keywords: "",
   current_promotion: "",
+  timezone: "",
 };
+
+/**
+ * The zones a local US business is in. Anything else already stored is added
+ * to the list, so an unusual value is never silently lost.
+ */
+const US_TIMEZONES = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  "America/Puerto_Rico",
+];
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -464,6 +481,18 @@ export function ClientPanel({
               value={values.meta_pixel_id}
               aiFilled={aiFields.has("meta_pixel_id")}
               onChange={(e) => set("meta_pixel_id", e.target.value)}
+            />
+            <Combobox
+              label="Time zone"
+              value={values.timezone ?? ""}
+              options={[
+                ...US_TIMEZONES,
+                ...(values.timezone && !US_TIMEZONES.includes(values.timezone) ? [values.timezone] : []),
+              ].map((id) => ({ id, name: id }))}
+              placeholder="Filled from the ad account when left blank"
+              hint="Sets what day it is for the copy and the ad names. Taken from the Meta ad account if you leave it empty."
+              error={errors.timezone}
+              onChange={(id) => set("timezone", id)}
             />
           </div>
 
