@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { requireEnv } from "@/lib/env";
 
+import { normalizeBrandVoice } from "./brand-voice-normalize.ts";
 import { htmlToText, selectPagesToRead } from "./discover-pages.ts";
 
 export const BrandVoiceSchema = z.object({
@@ -17,7 +18,9 @@ export const BrandVoiceSchema = z.object({
     .describe("Distinctive phrases the brand actually uses, verbatim, newline separated."),
   never_say: z
     .string()
-    .describe("Words, claims, or framings this brand avoids or must avoid, newline separated."),
+    .describe(
+      "A plain list, one item per line, of words, claims or framings the ads must avoid. Never guidance, never prose, and never the brand's own offers.",
+    ),
 });
 
 export type BrandVoice = z.infer<typeof BrandVoiceSchema>;
@@ -102,8 +105,9 @@ export async function scrapeBrandVoice(
 Rules:
 - Describe how the brand ACTUALLY sounds, from the copy in front of you. Do not invent an aspirational voice it has not earned.
 - key_phrases must be phrases the site genuinely uses. Quote them. Do not paraphrase and do not invent taglines.
-- never_say should capture what this brand avoids — claims it does not make, registers it does not use, competitor framing it stays away from.
-- NEVER invent an offer, discount, price, percentage, or time window. If the site states one, you may note it; if it does not, say nothing about offers.
+- never_say is a LIST: one word, claim or framing per line, each something the ads must not say. Registers the brand does not use, claims it does not make, competitor framing it stays away from. It is pasted into the ad writer's prompt under the heading "NEVER USE THESE WORDS OR CLAIMS", so anything in it is forbidden verbatim. Do not write guidance or explanation there.
+- Say NOTHING about offers, discounts, prices, percentages, deadlines or promotions, in any field. The brand's current offer is captured separately and is what the ads sell. Putting it in never_say bans the one thing the ad exists to say. Do not quote it, do not tell the writer to preserve it, do not mention it.
+- No em dashes or en dashes anywhere in the output. Use a comma, a colon or a full stop.
 - If the copy is thin, say so rather than padding.${guidance ? `\n\n${guidance}` : ""}`,
     messages: [
       {
@@ -122,5 +126,5 @@ Rules:
     throw new Error("Brand voice analysis returned an unexpected shape.");
   }
 
-  return response.parsed_output;
+  return normalizeBrandVoice(response.parsed_output);
 }

@@ -13,18 +13,21 @@
  * square.
  */
 
-/** Trailing size markers, in the forms exports actually use. */
-const SIZE_TOKEN = new RegExp(
-  [
-    // Aspect ratios: 1x1, 4x5, 9x16, 1.91x1.
-    String.raw`\d{1,3}(?:[.,]\d{1,2})?x\d{1,3}(?:[.,]\d{1,2})?`,
-    // Pixel dimensions: 1080x1080, 1200x628.
-    String.raw`\d{3,4}\s*[x×]\s*\d{3,4}`,
-    // Words.
-    // "Horz" was the one a real export used and the one this list lacked, so
-    // three horizontals arrived as three new creatives beside their siblings.
-    String.raw`(?:squares?|sqr?|verticals?|vert|portraits?|port|tall|stor(?:y|ies)|reels?|landscapes?|land|horizontals?|horiz|horz|hor|hz|wide|banners?|feed)`,
-  ].join("|"),
+/** Size markers, in the forms exports actually use. */
+const RATIO = String.raw`\d{1,3}(?:[.,]\d{1,2})?x\d{1,3}(?:[.,]\d{1,2})?`; // 1x1, 4x5, 9x16, 1.91x1
+const PIXELS = String.raw`\d{3,4}\s*[x×]\s*\d{3,4}`; // 1080x1080, 1200x628
+const WORDS = String.raw`(?:squares?|sqr?|verticals?|vert|portraits?|stor(?:y|ies)|reels?|landscapes?|horizontals?|horiz|horz|wide|banners?|feed)`;
+
+const SIZE_TOKEN = new RegExp([RATIO, PIXELS, WORDS].join("|"), "i");
+const SEP = String.raw`[\s._-]`;
+
+/**
+ * A size followed by a variant number: "NorCal_Sept26_Horz-5". A word may
+ * touch its number ("vert5"); a numeric size must not, or "9x16" would be
+ * read as the ratio "9x1" plus the number "6".
+ */
+const SIZE_THEN_NUMBER = new RegExp(
+  `${SEP}+(?:${WORDS}${SEP}*|(?:${RATIO}|${PIXELS})${SEP}+)(\\d{1,3})$`,
   "i",
 );
 
@@ -39,6 +42,12 @@ const SEPARATOR = /[\s._-]+$/;
  */
 export function stemOf(filename: string): string {
   let stem = filename.replace(EXTENSION, "").trim();
+
+  // A size word followed by a variant number: "NorCal_Sept26_Horz-5". The
+  // number is the identity (five different ads) and the word is not, so the
+  // word goes and the number stays. Fifteen files became fifteen creatives
+  // before this, because none of them ENDED in a size.
+  stem = stem.replace(SIZE_THEN_NUMBER, "-$1");
 
   // Repeat, because exports carry both a ratio and a pixel size often enough.
   for (let pass = 0; pass < 3; pass++) {

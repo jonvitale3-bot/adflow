@@ -61,14 +61,28 @@ test("order within a group is the order dropped", () => {
 });
 
 test("the abbreviations designers actually type are size markers", () => {
-  // "Keys_4-Horz" arrived beside "Keys_4-Sq" and "Keys_4-Vert" and became its
-  // own creative, because the list knew "horiz" and not "horz".
-  assert.equal(stemOf("Keys_4-Horz.jpg"), "Keys_4");
-  assert.equal(groupKey("Keys_4-Horz.jpg"), groupKey("Keys_4-Vert.jpg"));
-  assert.equal(groupKey("Keys_4-Horz.jpg"), groupKey("Keys_4-Sq.jpg"));
-  assert.equal(stemOf("hero-hor.png"), "hero");
-  assert.equal(stemOf("hero-land.png"), "hero");
-  assert.equal(stemOf("hero-port.png"), "hero");
-  assert.equal(stemOf("hero-tall.png"), "hero");
-  assert.equal(stemOf("hero-sqr.png"), "hero");
+  // "Horz" came from a real export. The list stays at what exports use:
+  // "hor", "port" and "land" were tried and reached into real names.
+  assert.equal(stemOf("hero-horz.jpg"), "hero");
+  assert.equal(stemOf("hero-sqr.jpg"), "hero");
+  assert.equal(groupKey("Keys_4-Horz.png"), groupKey("Keys_4-Sq.png"));
+  assert.equal(groupKey("Keys_4-Vert.png"), groupKey("Keys_4-Sq.png"));
+});
+
+test("a size word before the variant number is stripped and the number kept", () => {
+  // The real export: three sizes of five ads, numbered after the size word.
+  assert.equal(groupKey("NorCal_Sept26_Horz-5.png"), groupKey("NorCal_Sept26_Vert-5.png"));
+  assert.equal(groupKey("NorCal_Sept26_Horz-5.png"), groupKey("NorCal-Sept26_Sq-5.png"));
+  // The number is what tells ad 5 from ad 4.
+  assert.notEqual(groupKey("NorCal_Sept26_Horz-5.png"), groupKey("NorCal_Sept26_Horz-4.png"));
+  assert.equal(stemOf("NorCal_Sept26_Horz-5.png"), "NorCal_Sept26-5");
+  // Attached or separated, the number survives the same way.
+  assert.equal(groupKey("hero_vert5.jpg"), groupKey("hero-sq-5.jpg"));
+});
+
+test("a size word inside a real name is left alone", () => {
+  // "port" and "land" were in the list briefly; Port Orange is a market.
+  assert.equal(stemOf("port-orange-1x1.jpg"), "port-orange");
+  assert.equal(stemOf("the-landing-2.jpg"), "the-landing-2");
+  assert.equal(stemOf("1x1-hero.jpg"), "1x1-hero");
 });
