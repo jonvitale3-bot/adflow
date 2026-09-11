@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { applyMapping, matchCreative, suggestMapping } from "./parse.ts";
+import { applyMapping, findHeaderRow, matchCreative, suggestMapping } from "./parse.ts";
 
 test("this app's own export headers map with no manual work", () => {
   // "Export, edit in Sheets with the client, re-import" is the common path and
@@ -83,4 +83,43 @@ test("an image reference falls back to matching the stored filename", () => {
 test("an unmatched or missing reference yields null rather than a wrong image", () => {
   assert.equal(matchCreative("nothing-like-this", creatives), null);
   assert.equal(matchCreative(undefined, creatives), null);
+});
+
+test("the header row is found under a title banner and a note", () => {
+  // The real sheet: a title, a line of notes, a blank row, then the headers.
+  const grid = [
+    ["Carefree Boat Club of South Florida · Meta Ad Copy", "", "", ""],
+    ["CTA for all ads: Learn More · Feed placements use the Feed image", "", "", ""],
+    ["", "", "", ""],
+    ["Ad #", "Ad Name", "Primary Text", "Headline"],
+    ["01", "Locally Owned", "Locally and independently owned...", "Independently Owned"],
+  ];
+  assert.equal(findHeaderRow(grid), 3);
+});
+
+test("a sheet that already starts with its headers is unchanged", () => {
+  const grid = [
+    ["Headline", "Primary text", "Image"],
+    ["Your Boat Is Waiting", "One membership...", "ad-01.jpg"],
+  ];
+  assert.equal(findHeaderRow(grid), 0);
+});
+
+test("a trailing notes row is never mistaken for a header", () => {
+  const grid = [
+    ["Headline", "Primary text"],
+    ["Your Boat Is Waiting", "One membership..."],
+    ["Notes: headlines over 40 characters may truncate", ""],
+  ];
+  assert.equal(findHeaderRow(grid), 0);
+});
+
+test("reported row numbers point at the real line in the sheet", () => {
+  // Header on row 4 of the sheet means the first data row is row 5.
+  const { rows } = applyMapping(
+    [{ Headline: "A headline", "Primary Text": "Some body copy" }],
+    { headline: "Headline", primary_text: "Primary Text" },
+    3,
+  );
+  assert.equal(rows[0]!.rowNumber, 5);
 });

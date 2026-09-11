@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
 import { decodeSheetBytes } from "@/lib/import/decode";
-import { applyMapping, suggestMapping, type ImportField } from "@/lib/import/parse";
+import {
+  applyMapping,
+  findHeaderRow,
+  suggestMapping,
+  type ImportField,
+} from "@/lib/import/parse";
 import { validateVariation } from "@/lib/generation/validate";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,9 +64,22 @@ export async function POST(request: Request) {
   }
 
   const sheet = workbook.Sheets[sheetName]!;
+
+  // Find the header row before trusting it. A sheet from a designer or a
+  // client often opens with a title and a note, and reading row 1 as the
+  // column names meant no headline column existed and the import did nothing.
+  const grid = XLSX.utils.sheet_to_json<string[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+    blankrows: true,
+  });
+  const headerRow = findHeaderRow(grid.map((r) => (r ?? []).map((c) => String(c ?? ""))));
+
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: "",
     raw: false,
+    range: headerRow,
   });
 
   if (rows.length === 0) {
@@ -83,7 +101,26 @@ export async function POST(request: Request) {
     ? JSON.parse(String(mappingRaw))
     : suggestMapping(headers);
 
-  const { rows: mapped, problems } = applyMapping(stringRows, mapping);
+  // Without these two columns there is no ad, and returning an empty preview
+  // reads as "nothing happened" rather than "I could not find your copy".
+  if (!mapping.headline || !mapping.primary_text) {
+    const missing = [!mapping.headline && "headline", !mapping.primary_text && "primary text"]
+      .filter(Boolean)
+      .join(" and ");
+    return NextResponse.json(
+      {
+        error: `Could not find a ${missing} column. The columns read were: ${headers
+          .filter((h) => !/^__EMPTY/.test(h))
+          .join(", ")}. Pick the columns by hand, or rename them in the sheet.`,
+        headers,
+        mapping,
+        headerRow,
+      },
+      { status: 400 },
+    );
+  }
+
+  const { rows: mapped, problems } = applyMapping(stringRows, mapping, headerRow);
 
   // Copy rules run as WARNINGS here, never rejections. Human-written copy is a
   // deliberate choice; the app flags, the operator decides.
@@ -98,6 +135,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     sheetName,
     sheetNames: workbook.SheetNames,
+    headerRow,
     headers,
     mapping,
     total: mapped.length,

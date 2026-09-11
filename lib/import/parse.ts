@@ -48,6 +48,46 @@ const SIGNALS: Record<ImportField, RegExp[]> = {
   angle: [/^angle$/i, /^theme$/i, /angle/i],
 };
 
+/**
+ * Which row holds the column names.
+ *
+ * A sheet handed over by a designer or a client rarely starts with its header
+ * row. This one opened with a title banner, a line of notes and a blank row,
+ * so the parser took the title as the only column name and found no headline
+ * column at all: the upload did nothing, with nothing to say about why.
+ *
+ * Scored rather than assumed. A header row has several non-empty cells and
+ * tends to contain the words this importer already knows how to map, while a
+ * title banner is one long cell and a notes line is prose.
+ */
+export function findHeaderRow(grid: string[][], limit = 15): number {
+  let best = 0;
+  let bestScore = -1;
+
+  for (let i = 0; i < Math.min(grid.length, limit); i++) {
+    const cells = (grid[i] ?? []).map((c) => (c ?? "").trim());
+    const filled = cells.filter(Boolean);
+    // A single cell is a title, not a header row.
+    if (filled.length < 2) continue;
+    // Nothing underneath it means it is a trailing note, not a header.
+    if (!(grid[i + 1] ?? []).some((c) => (c ?? "").trim())) continue;
+
+    // A header names things; it does not write sentences.
+    const wordy = filled.filter((c) => c.length > 40).length;
+    const known = filled.filter((c) =>
+      Object.values(SIGNALS).some((patterns) => patterns.some((p) => p.test(c))),
+    ).length;
+
+    const score = known * 10 + filled.length - wordy * 5;
+    if (score > bestScore) {
+      bestScore = score;
+      best = i;
+    }
+  }
+
+  return best;
+}
+
 export function suggestMapping(headers: string[]): Partial<Record<ImportField, string>> {
   const mapping: Partial<Record<ImportField, string>> = {};
   const taken = new Set<string>();
@@ -86,6 +126,8 @@ export interface RowProblem {
 export function applyMapping(
   rows: Array<Record<string, string>>,
   mapping: Partial<Record<ImportField, string>>,
+  /** Where the header row sat, so reported row numbers match the sheet. */
+  headerRow = 0,
 ): { rows: ImportRow[]; problems: RowProblem[] } {
   const out: ImportRow[] = [];
   const problems: RowProblem[] = [];
@@ -95,7 +137,8 @@ export function applyMapping(
 
   rows.forEach((raw, index) => {
     // +2: one for the header row, one because spreadsheets are 1-indexed.
-    const rowNumber = index + 2;
+    // Plus wherever the header actually was, when it was not the first row.
+    const rowNumber = index + headerRow + 2;
 
     const headline = headlineCol ? (raw[headlineCol] ?? "").trim() : "";
     const primaryText = bodyCol ? (raw[bodyCol] ?? "").trim() : "";
