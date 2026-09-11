@@ -103,6 +103,23 @@ const CLUB_COUNT = new RegExp(
   "i",
 );
 
+/**
+ * A star rating, in any of the forms it gets written in.
+ *
+ * "Rated 4.7 stars by members on Google" is a rating, not a membership count,
+ * but the count rule saw a number two words before "members" and flagged a
+ * real client's ad. Ratings are removed from the sentence before the count
+ * rule reads it, so the figure that remains is a figure about people.
+ */
+const RATING_FIGURE =
+  /\b\d(?:\.\d)?\s*(?:stars?\b|[\u2605\u2606\u2b50\u272a\u272d]|\/\s*5\b|out of 5\b)/gi;
+
+function claimsMembershipCount(text: string): boolean {
+  return text
+    .split(/(?<=[.!?\n])\s+/)
+    .some((sentence) => CLUB_COUNT.test(sentence.replace(RATING_FIGURE, " ")));
+}
+
 const COST_COMPARISON = [
   "cheaper than owning",
   "fraction of the cost",
@@ -223,7 +240,7 @@ export function validateBoatClubVariation(v: Checkable): CopyWarning[] {
     }
   }
 
-  if (CLUB_COUNT.test(lower)) {
+  if (claimsMembershipCount(lower)) {
     warnings.push({
       rule: "membership_count",
       detail:

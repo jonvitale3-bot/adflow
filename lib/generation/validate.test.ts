@@ -184,3 +184,31 @@ test("a symbol elsewhere in the ad does not excuse an invented count", () => {
   const text = "4.7\u2605 from 157 Google reviews.\n\nHundreds of members near you.";
   assert.ok(rules(validateVariation(v({ primary_text: text }))).includes("invented_social_proof"));
 });
+
+test("a star rating is not a membership count", () => {
+  // "Rated 4.7 stars by members on Google" flagged on a real client's ad,
+  // because a number sat two words before "members".
+  const clean = validateBoatClubVariation({
+    headline: "Independently Owned Since 2008",
+    primary_text:
+      "Locally and independently owned in South Florida.\nRated 4.7 stars by members on Google. See membership options near you.",
+  });
+  assert.ok(
+    !clean.some((w) => w.rule === "membership_count"),
+    `rating wrongly read as a count: ${JSON.stringify(clean)}`,
+  );
+
+  // The rule itself still holds: an actual count is still a count.
+  const counted = validateBoatClubVariation({
+    headline: "Join The Club Today",
+    primary_text: "More than 500 members boat with us every weekend.",
+  });
+  assert.ok(counted.some((w) => w.rule === "membership_count"));
+
+  // And a rating alongside a real count does not launder it.
+  const both = validateBoatClubVariation({
+    headline: "Join The Club Today",
+    primary_text: "Rated 4.7 stars by our 500 members on Google.",
+  });
+  assert.ok(both.some((w) => w.rule === "membership_count"));
+});
